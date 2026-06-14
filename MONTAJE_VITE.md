@@ -41,8 +41,10 @@ npm test          # smoke test: monta la app en jsdom y verifica que renderiza
   - `cg-data.jsx` hace `CG.refresh()` → `fetch('/api/cg-data')` y **fusiona** sobre
     los mock (mismas claves). Si la API no responde, conserva los mock.
   - Al llegar los datos dispara `cg:data` y la app se re-renderiza.
-  - **Mapeado hasta ahora:** `config.productos`, `ops.clientes`, `ops.cobranza`,
-    `ops.pedidos`. Pendiente: panel, despiece, bascula, cobro, precios, recetas.
+  - **Mapeado:** `data.panel`, `data.compra`, `data.despiece`, `data.bascula`,
+    `data.cobro`; `config.productos`, `config.precios`, `config.cold`,
+    `config.payment`; `ops.pedidos`, `ops.clientes`, `ops.cobranza`,
+    `ops.rendimiento`, `ops.pos`. (Recetas conserva la semilla real del mock.)
   - **Variables de entorno en Vercel** (Production/Preview/Development):
     - `SUPABASE_URL` = `https://uajezdrnqujmutjokwfo.supabase.co`
     - `SUPABASE_SERVICE_ROLE_KEY` = (secreto — solo en Vercel, nunca en el repo)
