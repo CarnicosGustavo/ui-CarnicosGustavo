@@ -582,7 +582,7 @@ function RecetasScreen({ ai }) {
               <span style={{ width:7, height:7, borderRadius:"50%", background: saving?Cr.amber:Cr.green }} />
               {saving ? "Guardando…" : "Guardado"}
             </span>
-            <Btn kind="outline" size="sm" icon="upload">Importar configurador</Btn>
+            <Btn kind="outline" size="sm" icon="upload" onClick={()=>window.pickFile&&window.pickFile(".json,.csv")}>Importar configurador</Btn>
           </div>
         } />
       <Slot id="recetas" ai={ai} />

@@ -142,10 +142,11 @@ function TopBar({ current, theme }) {
       </div>
       <div style={{ justifySelf:"end", display:"flex", alignItems:"center", gap:10 }}>
         <ThemeControl palette={theme.palette} mode={theme.mode} setTheme={theme.set} />
-        <div style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
-          display:"grid", placeItems:"center" }}>
+        <button title="Mi perfil" onClick={()=>window.__cgGo&&window.__cgGo("perfil")}
+          style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
+          display:"grid", placeItems:"center", cursor:"pointer" }}>
           <Icon name="user" size={19} color={Ca.inkSoft} />
-        </div>
+        </button>
       </div>
     </header>
   );
@@ -247,7 +248,7 @@ function App() {
     open: ()=> setChatOpen(true),
   };
   const go = (id)=>{ setCurrent(id); const main=document.querySelector(".cg-main"); if(main) main.scrollTop=0; };
-  useEffect(()=>{ window.__cgGo = go; }, []);
+  useEffect(()=>{ window.__cgGo = go; window.__cgSetTheme = setTheme; }, []);
 
   const screens = {
     panel:    <PanelScreen ai={ai} />,
@@ -267,6 +268,7 @@ function App() {
     caja:     <CajaScreen ai={ai} />,
     config:   <ConfigScreen ai={ai} go={go} />,
     settings: <ConfigScreen ai={ai} go={go} />,
+    perfil:   <ProfileScreen ai={ai} />,
   };
   const content = screens[current] || <PlaceholderScreen id={current} ai={ai} />;
   const theme = { palette, mode, set:setTheme };

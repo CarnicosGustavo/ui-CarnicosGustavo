@@ -101,7 +101,17 @@ function ProfileScreen({ ai }) {
     empresa:"Cárnicos Gustavo", desdeHace:"3 años" };
   const [newPass, setNewPass] = useState("");
   const [darkMode, setDarkMode] = useState(localStorage.getItem("cg_mode")==="dark");
-  
+  const aplicarTema = (mode)=>{
+    setDarkMode(mode==="dark");
+    const pal = localStorage.getItem("cg_palette") || "warm";
+    if (window.__cgSetTheme) window.__cgSetTheme(pal, mode);
+    else { window.CG.applyTheme(pal, mode); localStorage.setItem("cg_mode", mode); }
+  };
+  const cambiarEmail = ()=> window.prompt("Nuevo correo electrónico", user.email);
+  const nuevaPass = ()=> window.prompt("Escribe la nueva contraseña");
+  const cerrarSesion = ()=>{ sessionStorage.removeItem("cg_unlocked"); window.location.reload(); };
+  const eliminarCuenta = ()=>{ if (window.confirm("¿Eliminar tu cuenta? Esta acción no se puede deshacer.")) cerrarSesion(); };
+
   return (
     <div>
       <ScreenHead title="Perfil" desc="Tu cuenta, preferencias y configuración de la plataforma." />
@@ -122,8 +132,8 @@ function ProfileScreen({ ai }) {
               {user.email}
             </div>
             <div style={{ display:"flex", gap:10, marginTop:12 }}>
-              <Btn kind="outline" size="sm" icon="mail">Cambiar email</Btn>
-              <Btn kind="outline" size="sm" icon="key">Nueva contraseña</Btn>
+              <Btn kind="outline" size="sm" icon="mail" onClick={cambiarEmail}>Cambiar email</Btn>
+              <Btn kind="outline" size="sm" icon="key" onClick={nuevaPass}>Nueva contraseña</Btn>
             </div>
           </div>
         </Card>
@@ -135,12 +145,12 @@ function ProfileScreen({ ai }) {
             <div>
               <div style={{ font:`600 12px/1 ${Ff.ui}`, color:Cf.inkSoft, marginBottom:8 }}>Tema</div>
               <div style={{ display:"flex", gap:7 }}>
-                <button onClick={()=>{ setDarkMode(false); localStorage.setItem("cg_mode","light"); }} 
+                <button onClick={()=>aplicarTema("light")}
                   style={{ flex:1, padding:"10px 12px", borderRadius:10, border:`2px solid ${!darkMode?Cf.red:Cf.line}`,
                     background:!darkMode?Cf.redWash:Cf.paper, cursor:"pointer", font:`700 12px/1 ${Ff.ui}`, color:Cf.ink }}>
                   ☀️ Claro
                 </button>
-                <button onClick={()=>{ setDarkMode(true); localStorage.setItem("cg_mode","dark"); }}
+                <button onClick={()=>aplicarTema("dark")}
                   style={{ flex:1, padding:"10px 12px", borderRadius:10, border:`2px solid ${darkMode?Cf.red:Cf.line}`,
                     background:darkMode?Cf.redWash:Cf.paper, cursor:"pointer", font:`700 12px/1 ${Ff.ui}`, color:Cf.ink }}>
                   🌙 Oscuro
@@ -187,8 +197,8 @@ function ProfileScreen({ ai }) {
         <Card style={{ background:Cf.redWash, border:`1px solid ${Cf.red}` }}>
           <Label>Zona de peligro</Label>
           <div style={{ marginTop:12, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <Btn kind="outline" icon="log-out">Cerrar sesión</Btn>
-            <Btn kind="outline" icon="trash-2" style={{ color:Cf.red }}>Eliminar cuenta</Btn>
+            <Btn kind="outline" icon="log-out" onClick={cerrarSesion}>Cerrar sesión</Btn>
+            <Btn kind="outline" icon="trash-2" style={{ color:Cf.red }} onClick={eliminarCuenta}>Eliminar cuenta</Btn>
           </div>
         </Card>
       </div>
