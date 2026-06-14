@@ -46,14 +46,19 @@ function AntonellaSlot({ data, onChip, onOpen, onNav }) {
                 {(data.acciones||[]).map((a,i)=>{
                   const label = typeof a === "object" ? a.label : a;
                   const ic = typeof a === "object" ? a.icon : null;
+                  // Chip que NAVEGA (a.go) vs chip que MANDA AL CHAT. Las de chat
+                  // llevan una flecha "↘" indicando que se envían a iAntonella.
+                  const isChat = !(typeof a === "object" && a.go);
                   return (
-                  <button key={i} onClick={()=>runAction(a)} className="cg-chip" style={{
+                  <button key={i} onClick={()=>runAction(a)} className="cg-chip"
+                    title={isChat ? "Preguntar a iAntonella" : undefined} style={{
                     font:`700 12.5px/1 ${Fn.ui}`, color: i===0?Cn.chromeFg:Cn.ink,
                     background: i===0?Cn.chrome:"transparent",
                     border:`1px solid ${i===0?Cn.chrome:Cn.line}`, padding:"8px 12px",
                     borderRadius:999, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6 }}>
                     {(ic || i===0) && <Icon name={ic || "sparkles"} size={13} color={i===0?Cn.redSoft:Cn.inkSoft} />}
                     {label}
+                    {isChat && <Icon name="corner-down-right" size={12} color={i===0?Cn.redSoft:Cn.inkFaint} />}
                   </button>
                   );
                 })}
