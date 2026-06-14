@@ -69,26 +69,27 @@
 <body>
 <div id="root"></div>
 
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Dependencias globales (UMD) — el JSX original las usa como globales -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 
-<script type="text/babel" src="cg-data.jsx"></script>
-<script type="text/babel" src="cg-ui.jsx"></script>
-<script type="text/babel" src="cg-antonella.jsx"></script>
-<script type="text/babel" src="cg-ai-kit.jsx"></script>
-<script type="text/babel" src="cg-cold.jsx"></script>
-<script type="text/babel" src="cg-secure-dashboard.jsx"></script>
-<script type="text/babel" src="cg-flows.jsx"></script>
-<script type="text/babel" src="cg-screens-prof.jsx"></script>
-<script type="text/babel" src="cg-screens-a.jsx"></script>
-<script type="text/babel" src="cg-screens-b.jsx"></script>
-<script type="text/babel" src="cg-screens-c.jsx"></script>
-<script type="text/babel" src="cg-screens-d.jsx"></script>
-<script type="text/babel" src="cg-recetas.jsx"></script>
-<script type="text/babel" src="cg-config.jsx"></script>
-<script type="text/babel" src="cg-designsystem.jsx"></script>
-<script type="text/babel" src="cg-app.jsx"></script>
+<!-- Pantallas: cg-*.jsx transpilados a scripts clásicos (build-cg.mjs → public/cg/). JSX idéntico. -->
+<script src="/cg/cg-data.js"></script>
+<script src="/cg/cg-ui.js"></script>
+<script src="/cg/cg-antonella.js"></script>
+<script src="/cg/cg-ai-kit.js"></script>
+<script src="/cg/cg-cold.js"></script>
+<script src="/cg/cg-secure-dashboard.js"></script>
+<script src="/cg/cg-flows.js"></script>
+<script src="/cg/cg-screens-prof.js"></script>
+<script src="/cg/cg-screens-a.js"></script>
+<script src="/cg/cg-screens-b.js"></script>
+<script src="/cg/cg-screens-c.js"></script>
+<script src="/cg/cg-screens-d.js"></script>
+<script src="/cg/cg-recetas.js"></script>
+<script src="/cg/cg-config.js"></script>
+<script src="/cg/cg-designsystem.js"></script>
+<script src="/cg/cg-app.js"></script>
 </body>
 </html>

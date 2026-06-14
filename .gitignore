@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# Generado por scripts/build-cg.mjs (se reconstruye en cada build)
+public/cg/
+.DS_Store
+*.local
+.vercel
