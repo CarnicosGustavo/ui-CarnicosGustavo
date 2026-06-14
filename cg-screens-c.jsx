@@ -42,10 +42,26 @@ function SearchFilter({ placeholder, filters, value, onFilter, right }) {
 }
 
 /* Botón de ícono para acciones de fila */
-function RowAct({ icon, color, title }) {
-  return <button title={title} style={{ width:34, height:34, borderRadius:8, border:`1px solid ${Cx.line}`,
+function RowAct({ icon, color, title, onClick }) {
+  return <button title={title} onClick={onClick} style={{ width:34, height:34, borderRadius:8, border:`1px solid ${Cx.line}`,
     background:Cx.paper, cursor:"pointer", display:"grid", placeItems:"center" }}>
     <Icon name={icon} size={15} color={color||Cx.inkSoft} /></button>;
+}
+/* Abre WhatsApp con el teléfono (si hay) y un texto opcional */
+function waOpen(tel, text){
+  const num = (tel||"").replace(/\D/g,"");
+  window.open("https://wa.me/" + num + (text ? "?text="+encodeURIComponent(text) : ""), "_blank");
+}
+/* Descarga un CSV a partir de filas (array de arrays) */
+function downloadCSV(name, rows){
+  const csv = rows.map(r=>r.map(c=>'"'+String(c==null?"":c).replace(/"/g,'""')+'"').join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download = name; a.click();
+}
+/* Abre el selector de archivos del sistema (importación) */
+function pickFile(accept){
+  const i = document.createElement("input"); i.type = "file"; if (accept) i.accept = accept; i.click();
 }
 const thBase = (align)=>({ textAlign:align, font:`700 11px/1 ${Fx.ui}`, letterSpacing:"0.05em",
   textTransform:"uppercase", color:Cx.inkFaint, padding:"12px 14px" });
@@ -56,24 +72,32 @@ function PedidosScreen({ ai }) {
   const [nuevoPedido, setNuevoPedido] = useState(false);
   const [pesaje, setPesaje] = useState(null);     // {n, pedido, precio} o null
   const [extra, setExtra] = useState([]);          // pedidos creados en sesión
-  const base = OPS.pedidos;
-  const all = [...extra, ...base];
-  const data = all.filter(p=> filtro==="Todos" || p.estado===filtro);
+  const [orden, setOrden] = useState(null);        // "total" | "fecha" | null
+  const [over, setOver] = useState({});            // id -> {estado} (cancelar)
+  const [hidden, setHidden] = useState([]);        // ids eliminados
+  let data = [...extra, ...OPS.pedidos]
+    .filter(p=> !hidden.includes(p.id))
+    .map(p=> over[p.id] ? { ...p, ...over[p.id] } : p)
+    .filter(p=> filtro==="Todos" || p.estado===filtro);
+  if (orden==="total") data = [...data].sort((a,b)=> b.total-a.total);
+  if (orden==="fecha") data = [...data].sort((a,b)=> String(b.fecha).localeCompare(String(a.fecha)));
+  const exportCSV = ()=> downloadCSV("pedidos.csv",
+    [["Pedido","Cliente","Total","Estado","Fecha"], ...data.map(p=>["#"+p.id, p.cliente, p.total, p.estado, p.fecha])]);
 
   const rowMenu = (p) => [
-    { label:"Ver detalle", icon:"eye", onClick:()=>ai.chip(`Abrir pedido #${p.id}`) },
-    { label:"Editar pedido", icon:"file-pen", onClick:()=>ai.chip(`Editar pedido #${p.id}`) },
+    { label:"Ver detalle", icon:"eye", onClick:()=>window.print() },
+    { label:"Editar pedido", icon:"file-pen", onClick:()=>setNuevoPedido(true) },
     ...(p.estado==="Por pesar" || p.estado==="Parcial"
       ? [{ label:"Ir a Pesaje", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 }) }] : []),
     ...(p.estado==="Lista para cobro"
       ? [{ label:"Ir a Pesaje", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 }) }] : []),
     { sep:true },
-    { label:"Imprimir ticket", icon:"printer", onClick:()=>ai.chip(`Imprimir ticket #${p.id}`) },
-    { label:"Duplicar", icon:"copy", onClick:()=>ai.chip(`Duplicar pedido #${p.id}`) },
-    { label:"Enviar por WhatsApp", icon:"message-circle", onClick:()=>ai.chip(`Enviar #${p.id} por WhatsApp`) },
+    { label:"Imprimir ticket", icon:"printer", onClick:()=>window.print() },
+    { label:"Duplicar", icon:"copy", onClick:()=>setExtra(arr=>[{ ...p, id:360+arr.length }, ...arr]) },
+    { label:"Enviar por WhatsApp", icon:"message-circle", onClick:()=>waOpen("", `Pedido #${p.id} de ${p.cliente}`) },
     { sep:true },
-    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>ai.chip(`Cancelar #${p.id}`) }] : []),
-    { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>ai.chip(`Eliminar #${p.id}`) },
+    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>setOver(o=>({ ...o, [p.id]:{ estado:"Cancelada" } })) }] : []),
+    { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>setHidden(h=>[...h, p.id]) },
   ];
 
   return (
@@ -86,7 +110,7 @@ function PedidosScreen({ ai }) {
               { label:"Pedido a crédito", icon:"hand-coins", onClick:()=>setNuevoPedido(true) },
               { sep:true },
               { label:"Pesar producto", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:"libre", precio:70 }) },
-              { label:"Importar pedidos (CSV)", icon:"upload", onClick:()=>ai.chip("Importar pedidos") },
+              { label:"Importar pedidos (CSV)", icon:"upload", onClick:()=>pickFile(".csv") },
             ]}>
             Nuevo pedido
           </SplitButton>
@@ -98,10 +122,10 @@ function PedidosScreen({ ai }) {
             filters={["Todos","Pagada","Por pesar","Lista para cobro","Cancelada"]}
             right={
               <Menu align="right" items={[
-                { label:"Exportar CSV", icon:"download", onClick:()=>ai.chip("Exportar pedidos CSV") },
-                { label:"Imprimir lista", icon:"printer", onClick:()=>ai.chip("Imprimir lista de pedidos") },
-                { label:"Ordenar por total", icon:"arrow-down-wide-narrow", onClick:()=>{} },
-                { label:"Ordenar por fecha", icon:"calendar", onClick:()=>{} },
+                { label:"Exportar CSV", icon:"download", onClick:exportCSV },
+                { label:"Imprimir lista", icon:"printer", onClick:()=>window.print() },
+                { label:"Ordenar por total", icon:"arrow-down-wide-narrow", onClick:()=>setOrden("total") },
+                { label:"Ordenar por fecha", icon:"calendar", onClick:()=>setOrden("fecha") },
               ]} trigger={<Btn kind="outline" size="sm" icon="sliders-horizontal">Vista</Btn>} />
             } />
         </div>
@@ -124,7 +148,7 @@ function PedidosScreen({ ai }) {
                   <td style={{ padding:"13px 14px", font:`500 13px/1 ${Fx.mono}`, color:Cx.inkSoft }}>{p.fecha}</td>
                   <td style={{ padding:"13px 14px" }}>
                     <div style={{ display:"flex", gap:7, justifyContent:"center", alignItems:"center" }}>
-                      <RowAct icon="eye" title="Ver detalle" />
+                      <RowAct icon="eye" title="Ver detalle" onClick={()=>window.print()} />
                       {(p.estado==="Por pesar"||p.estado==="Parcial") &&
                         <button title="Pesar" onClick={()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 })}
                           style={{ width:34, height:34, borderRadius:8, border:`1px solid ${Cx.amber}`, background:Cx.amberWash,
@@ -154,7 +178,9 @@ function PedidosScreen({ ai }) {
 function ClientesScreen({ ai }) {
   const [filtro, setFiltro] = useState("Todos");
   const [nuevo, setNuevo] = useState(false);
+  const [editC, setEditC] = useState(null);   // cliente a editar o null
   const [extra, setExtra] = useState([]);
+  const goTo = (m)=> window.__cgGo && window.__cgGo(m);
   const all = [...extra, ...OPS.clientes];
   const data = all.filter(c=> filtro==="Todos" || c.estado===filtro);
   return (
@@ -165,7 +191,9 @@ function ClientesScreen({ ai }) {
       <Card pad={0} style={{ overflow:"hidden" }}>
         <div style={{ padding:16, borderBottom:`1px solid ${Cx.line}` }}>
           <SearchFilter placeholder="Buscar cliente…" value={filtro} onFilter={setFiltro}
-            filters={["Todos","Activo","Inactivo"]} right={<Btn kind="outline" size="sm" icon="download">CSV</Btn>} />
+            filters={["Todos","Activo","Inactivo"]} right={<Btn kind="outline" size="sm" icon="download"
+              onClick={()=>downloadCSV("clientes.csv", [["Negocio","Teléfono","Saldo","Estado"],
+                ...data.map(c=>[c.nombre, c.tel||"", c.saldo, c.estado])])}>CSV</Btn>} />
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:640 }}>
@@ -187,15 +215,16 @@ function ClientesScreen({ ai }) {
                   <td style={{ padding:"13px 14px" }}><Badge tone={c.estado==="Activo"?"green":"ghost"}>{c.estado}</Badge></td>
                   <td style={{ padding:"13px 14px" }}>
                     <div style={{ display:"flex", gap:7, justifyContent:"center", alignItems:"center" }}>
-                      {c.tel && <RowAct icon="message-circle" color={Cx.green} title="WhatsApp" />}
+                      {c.tel && <RowAct icon="message-circle" color={Cx.green} title="WhatsApp"
+                        onClick={()=>waOpen(c.tel, `Hola ${c.nombre}`)} />}
                       <Kebab items={[
-                        { label:"Ver ficha 360°", icon:"id-card", onClick:()=>ai.chip(`Ficha de ${c.nombre}`) },
-                        { label:"Nuevo pedido", icon:"plus", onClick:()=>ai.chip(`Nuevo pedido para ${c.nombre}`) },
-                        { label:"Editar cliente", icon:"file-pen", onClick:()=>ai.chip(`Editar ${c.nombre}`) },
-                        ...(c.tel ? [{ label:"WhatsApp", icon:"message-circle", onClick:()=>ai.chip(`WhatsApp a ${c.nombre}`) }] : []),
-                        { label:"Estado de cuenta", icon:"file-text", onClick:()=>ai.chip(`Estado de cuenta ${c.nombre}`) },
+                        { label:"Nuevo pedido", icon:"plus", onClick:()=>goTo("pos") },
+                        { label:"Editar cliente", icon:"file-pen", onClick:()=>setEditC(c) },
+                        ...(c.tel ? [{ label:"WhatsApp", icon:"message-circle", onClick:()=>waOpen(c.tel, `Hola ${c.nombre}`) }] : []),
+                        { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("cobranza") },
                         { sep:true },
-                        { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>ai.chip(`Eliminar ${c.nombre}`) },
+                        { label:"Eliminar", icon:"trash-2", danger:true,
+                          onClick:()=>setExtra(arr=>arr.filter(x=>x.id!==c.id)) },
                       ]} />
                     </div>
                   </td>
@@ -208,12 +237,20 @@ function ClientesScreen({ ai }) {
       <NuevoClienteModal open={nuevo} onClose={()=>setNuevo(false)}
         onCreate={(c)=>{ const id = 100 + extra.length;
           setExtra(arr => [{ id, nombre:c.nombre, tel:c.tel, saldo:0, estado:"Activo", pedidos:0, gastado:0 }, ...arr]); }} />
+      <EditarClienteModal open={!!editC} cliente={editC} onClose={()=>setEditC(null)}
+        onSave={()=>setEditC(null)} />
     </div>
   );
 }
 
 /* ---------------- COBRANZA ---------------- */
 function CobranzaScreen({ ai }) {
+  const [abono, setAbono] = useState(null);   // cliente {nombre,saldo} o null
+  const goTo = (m)=> window.__cgGo && window.__cgGo(m);
+  const waRecordatorio = (c)=> window.open(
+    "https://wa.me/?text=" + encodeURIComponent(
+      "Hola " + c.cliente + ", le recordamos su saldo pendiente de " + mny(c.saldo) + ". ¡Gracias!"),
+    "_blank");
   const data = OPS.cobranza.filter(c=>c.saldo>0);
   const total = data.reduce((s,c)=>s+c.saldo,0);
   const antig = (d)=> d<=30?["green",d+" días"] : d<=60?["amber",d+" días"] : ["red",d+" días"];
@@ -256,12 +293,13 @@ function CobranzaScreen({ ai }) {
                     <td style={{ padding:"13px 14px" }}><Badge tone={tone}>{lab}</Badge></td>
                     <td style={{ padding:"13px 14px" }}>
                       <div style={{ display:"flex", gap:7, justifyContent:"center", alignItems:"center" }}>
-                        <Btn kind="green" size="sm" icon="banknote">Abonar</Btn>
+                        <Btn kind="green" size="sm" icon="banknote"
+                          onClick={()=>setAbono({ nombre:c.cliente, saldo:c.saldo })}>Abonar</Btn>
                         <Kebab items={[
-                          { label:"Registrar abono", icon:"banknote", onClick:()=>ai.chip(`Abono de ${c.cliente}`) },
-                          { label:"Estado de cuenta", icon:"file-text", onClick:()=>ai.chip(`Estado de cuenta ${c.cliente}`) },
-                          { label:"Recordatorio WhatsApp", icon:"message-circle", onClick:()=>ai.chip(`Recordar a ${c.cliente}`) },
-                          { label:"Ver pedidos a crédito", icon:"receipt-text", onClick:()=>ai.chip(`Pedidos a crédito de ${c.cliente}`) },
+                          { label:"Registrar abono", icon:"banknote", onClick:()=>setAbono({ nombre:c.cliente, saldo:c.saldo }) },
+                          { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("pedidos") },
+                          { label:"Recordatorio WhatsApp", icon:"message-circle", onClick:()=>waRecordatorio(c) },
+                          { label:"Ver pedidos a crédito", icon:"receipt-text", onClick:()=>goTo("pedidos") },
                         ]} />
                       </div>
                     </td>
@@ -272,6 +310,8 @@ function CobranzaScreen({ ai }) {
           </table>
         </div>
       </Card>
+      <AbonarModal open={!!abono} cliente={abono} onClose={()=>setAbono(null)}
+        onAbono={()=>setAbono(null)} />
     </div>
   );
 }
