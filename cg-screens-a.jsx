@@ -108,28 +108,33 @@ function PanelScreen({ ai }) {
 /* ---------------- COMPRA DEL DÍA ---------------- */
 function CompraScreen({ ai }) {
   const c = D.compra;
+  const [fecha, setFecha] = useState(c.fecha);
+  const [provs, setProvs] = useState(c.proveedores);
+  const sum = (k)=> provs.reduce((s,p)=>s+(Number(p[k])||0),0);
+  const hoy = ()=> setFecha(new Date().toLocaleDateString("es-MX",{ day:"2-digit", month:"2-digit", year:"numeric" }));
+  const addProv = ()=> setProvs(a=>[...a, { nombre:"Nuevo proveedor", americanos:0, nacionales:0, canales:0, kgPie:0, precioKg:0, kgCanal:0 }]);
   const chips = [
-    ["Americanos", c.americanos, Cs.red, Cs.redWash],
-    ["Nacionales", c.nacionales, Cs.green, Cs.greenWash],
-    ["Canales (total)", c.canales, Cs.ink, "transparent"],
-    ["Kg en pie", c.kgPie.toLocaleString("es-MX"), Cs.ink, "transparent"],
-    ["Kg / canal", c.kgCanal, Cs.ink, "transparent"],
+    ["Americanos", sum("americanos"), Cs.red, Cs.redWash],
+    ["Nacionales", sum("nacionales"), Cs.green, Cs.greenWash],
+    ["Canales (total)", sum("canales"), Cs.ink, "transparent"],
+    ["Kg en pie", sum("kgPie").toLocaleString("es-MX"), Cs.ink, "transparent"],
+    ["Kg / canal", sum("canales") ? (sum("kgPie")/sum("canales")).toFixed(1) : "0", Cs.ink, "transparent"],
   ];
   return (
     <div>
       <ScreenHead title="Compra del día" desc="El día empieza aquí: registra la compra en pie por proveedor. Es la base del rendimiento."
-        right={<Btn kind="dark" icon="save">Guardar compra del día</Btn>} />
+        right={<Btn kind="dark" icon="save" onClick={()=>window.__cgGo&&window.__cgGo("rendimiento")}>Guardar compra del día</Btn>} />
       <Card pad={16} style={{ marginBottom:14, display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
         <div>
           <Overline style={{ marginBottom:7 }}>Día de operación</Overline>
           <div style={{ display:"inline-flex", alignItems:"center", gap:9, border:`1px solid ${Cs.line}`,
             borderRadius:11, padding:"11px 14px", font:`600 14px/1 ${Fs.mono}`, color:Cs.ink, background:Cs.paper2 }}>
-            <Icon name="calendar" size={16} color={Cs.inkSoft} /> {c.fecha}
+            <Icon name="calendar" size={16} color={Cs.inkSoft} /> {fecha}
           </div>
         </div>
         <div style={{ marginLeft:"auto", display:"flex", gap:9 }}>
-          <Btn kind="outline" icon="rotate-ccw">Hoy</Btn>
-          <Btn kind="ghost">Empezar de ceros</Btn>
+          <Btn kind="outline" icon="rotate-ccw" onClick={hoy}>Hoy</Btn>
+          <Btn kind="ghost" onClick={()=>setProvs([])}>Empezar de ceros</Btn>
         </div>
       </Card>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
@@ -147,7 +152,7 @@ function CompraScreen({ ai }) {
       <Card>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
           <h3 style={{ margin:0, font:`700 16px/1 ${Fs.ui}`, color:Cs.ink }}>Compra en pie por proveedor</h3>
-          <Btn kind="outline" size="sm" icon="plus">Agregar proveedor</Btn>
+          <Btn kind="outline" size="sm" icon="plus" onClick={addProv}>Agregar proveedor</Btn>
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:640 }}>
@@ -157,7 +162,11 @@ function CompraScreen({ ai }) {
                   textTransform:"uppercase", color:Cs.inkFaint, padding:"0 12px 12px" }}>{h}</th>))}</tr>
             </thead>
             <tbody>
-              {c.proveedores.map((p,i)=>(
+              {provs.length===0 && (
+                <tr><td colSpan={7} style={{ padding:"22px 12px", textAlign:"center", font:`500 13px/1 ${Fs.ui}`, color:Cs.inkFaint }}>
+                  Sin proveedores. Usa "Agregar proveedor" para empezar.</td></tr>
+              )}
+              {provs.map((p,i)=>(
                 <tr key={i} style={{ borderTop:`1px solid ${Cs.lineSoft}` }}>
                   <td style={{ padding:"14px 12px", font:`700 14px/1 ${Fs.ui}`, color:Cs.ink }}>{p.nombre}</td>
                   <Cell v={p.americanos} accent={p.americanos>0?Cs.red:null} />

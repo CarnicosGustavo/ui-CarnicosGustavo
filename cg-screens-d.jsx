@@ -20,6 +20,9 @@ function RendimientoScreen({ ai }) {
   // estado de pesos reales (algunos sin capturar → iA puede estimar)
   const [reales, setReales] = useState(()=> r.piezas.map(p=>p.real));
   const setReal = (i,v)=> setReales(arr=>{ const n=[...arr]; n[i]=v; return n; });
+  const [showCal, setShowCal] = useState(true);
+  const goTo = (m)=> window.__cgGo && window.__cgGo(m);
+  const proyectar = ()=> setReales(r.piezas.map(p=>p.est));
 
   const totEst = r.piezas.reduce((s,p)=>s+p.est,0);
   const totReal = reales.reduce((s,v)=>s+(+v||0),0);
@@ -29,7 +32,7 @@ function RendimientoScreen({ ai }) {
   return (
     <div>
       <ScreenHead title="Rendimiento de Despiece" desc="Captura el peso real de cada pieza y compáralo con el estimado para medir el rendimiento del día y calibrar recetas."
-        right={<><Btn kind="outline" icon="sparkles">Proyectar piezas</Btn><Btn kind="dark" icon="save">Guardar hoja</Btn></>} />
+        right={<><Btn kind="outline" icon="sparkles" onClick={proyectar}>Proyectar piezas</Btn><Btn kind="dark" icon="save" onClick={()=>goTo("panel")}>Guardar hoja</Btn></>} />
       <Slot id="rendimiento" ai={ai} />
 
       <div style={{ display:"grid", gridTemplateColumns:"260px 1fr", gap:14, alignItems:"start" }} className="cg-two-col">
@@ -48,9 +51,11 @@ function RendimientoScreen({ ai }) {
             <Field label="Medias canal" value={r.canales} mono />
             <Field label="Kg comprado" value={r.kgComprado.toLocaleString("es-MX")} mono last />
           </Card>
-          <AiSuggestBar tone="sugerencia" title="Calibrar recetas con el día"
-            text={`Con estos pesos reales el americano rinde ${rend.toFixed(1)}%. Puedo recalibrar los % de las recetas para afinar las próximas estimaciones.`}
-            primary="Calibrar recetas" onPrimary={()=>{}} secondary="Ahora no" onSecondary={()=>{}} />
+          {showCal && (
+            <AiSuggestBar tone="sugerencia" title="Calibrar recetas con el día"
+              text={`Con estos pesos reales el americano rinde ${rend.toFixed(1)}%. Puedo recalibrar los % de las recetas para afinar las próximas estimaciones.`}
+              primary="Calibrar recetas" onPrimary={()=>goTo("recetas")} secondary="Ahora no" onSecondary={()=>setShowCal(false)} />
+          )}
         </div>
 
         {/* Tabla de piezas */}
@@ -123,6 +128,23 @@ function PosScreen({ ai }) {
   const faltan = cart.filter(it=>it.disp==="faltante").length;
   const despiece = cart.filter(it=>it.disp==="despiece").length;
 
+  // Agregar al carrito (acción central del POS)
+  const addItem = (it)=> setCart(c=>{
+    const i = c.findIndex(x=>x.n===it.n);
+    if (i>=0){ const n=[...c]; n[i]={ ...n[i], pz:n[i].pz+1 }; return n; }
+    return [...c, { n:it.n, precio:it.precio, disp:it.disp, pz:1, kg:0 }];
+  });
+  // Selects de la venta (cliente / método / lista) — ciclan opciones reales
+  const clientes = (OPSd.clientes||[]).map(c=>c.nombre);
+  const metodos = window.CG.config.payment || ["Efectivo","Tarjeta","Transferencia"];
+  const listas = p.listas || ["Mayoreo contado"];
+  const [cli, setCli] = useState(clientes[0] || "Cliente");
+  const [pago, setPago] = useState(metodos[0]);
+  const [lista, setLista] = useState(listas[0]);
+  const [factura, setFactura] = useState(false);
+  const cycle = (arr, cur, set)=>{ const i=arr.indexOf(cur); set(arr[(i+1)%arr.length]); };
+  const crearPedido = ()=> window.__cgGo && window.__cgGo(needWeigh ? "bascula" : "cobro");
+
   return (
     <div>
       <ScreenHead title="Punto de venta" desc="Captura el pedido del cliente. iAntonella clasifica cada pieza en stock, vía despiece o por pesar al agregarla." />
@@ -133,9 +155,9 @@ function PosScreen({ ai }) {
           <Card>
             <Overline style={{ marginBottom:12 }}>Detalles de la venta</Overline>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10 }}>
-              <PosSelect icon="user" label="Carnicería Marenco" />
-              <PosSelect icon="wallet" label="Efectivo" />
-              <PosSelect icon="tag" label="Mayoreo contado" />
+              <PosSelect icon="user" label={cli} onClick={()=>cycle(clientes, cli, setCli)} />
+              <PosSelect icon="wallet" label={pago} onClick={()=>cycle(metodos, pago, setPago)} />
+              <PosSelect icon="tag" label={lista} onClick={()=>cycle(listas, lista, setLista)} />
             </div>
           </Card>
           <Card pad={0} style={{ overflow:"hidden" }}>
@@ -148,7 +170,7 @@ function PosScreen({ ai }) {
               {p.catalogo.map((it,i)=>{
                 const d=DISP[it.disp];
                 return (
-                  <button key={i} className="cg-btn" style={{ textAlign:"left", cursor:"pointer", background:Cy.paper2,
+                  <button key={i} className="cg-btn" onClick={()=>addItem(it)} style={{ textAlign:"left", cursor:"pointer", background:Cy.paper2,
                     border:`1px solid ${Cy.line}`, borderRadius:12, padding:"12px 13px", minHeight:88 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
                       <span style={{ font:`700 13.5px/1.15 ${Fy.ui}`, color:Cy.ink }}>{it.n}</span>
@@ -208,11 +230,15 @@ function PosScreen({ ai }) {
               <Overline>Total estimado</Overline>
               <div style={{ font:`400 28px/1 ${Fy.display}`, color:Cy.ink }}>{mnyD(total)}</div>
             </div>
-            <label style={{ display:"flex", alignItems:"center", gap:9, marginBottom:12, cursor:"pointer" }}>
-              <span style={{ width:20, height:20, borderRadius:6, border:`1.5px solid ${Cy.line}`, background:Cy.paper2, display:"grid", placeItems:"center" }} />
+            <label onClick={()=>setFactura(f=>!f)} style={{ display:"flex", alignItems:"center", gap:9, marginBottom:12, cursor:"pointer" }}>
+              <span style={{ width:20, height:20, borderRadius:6, border:`1.5px solid ${factura?Cy.green:Cy.line}`,
+                background:factura?Cy.green:Cy.paper2, display:"grid", placeItems:"center" }}>
+                {factura && <Icon name="check" size={14} color="#fff" />}
+              </span>
               <span style={{ font:`600 13px/1 ${Fy.ui}`, color:Cy.ink80 }}>Factura (NFC-e)</span>
             </label>
-            <Btn kind={needWeigh?"dark":"green"} size="lg" block icon={needWeigh?"scale":"check"}>
+            <Btn kind={needWeigh?"dark":"green"} size="lg" block icon={needWeigh?"scale":"check"}
+              onClick={ cart.length ? crearPedido : undefined }>
               {needWeigh ? "Crear pedido · requiere pesaje" : "Crear pedido"}
             </Btn>
           </div>
@@ -222,9 +248,9 @@ function PosScreen({ ai }) {
   );
 }
 const posStep = { width:30, height:34, border:"none", background:Cy.paper2, cursor:"pointer", font:`700 16px/1 ${Fy.ui}`, color:Cy.ink };
-function PosSelect({ icon, label }) {
+function PosSelect({ icon, label, onClick }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cy.line}`, borderRadius:10,
+    <div onClick={onClick} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cy.line}`, borderRadius:10,
       padding:"12px 13px", background:Cy.paper2, cursor:"pointer" }}>
       <Icon name={icon} size={16} color={Cy.inkSoft} />
       <span style={{ flex:1, font:`700 13.5px/1 ${Fy.ui}`, color:Cy.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>

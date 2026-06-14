@@ -12,13 +12,18 @@ function DespieceScreen({ ai }) {
   const d = Db.despiece;
   const [sel, setSel] = useState("ame");
   const [n, setN] = useState(1);
-  const canal = d.canales.find(x=>x.id===sel);
+  const [canales, setCanales] = useState(d.canales);
+  const canal = canales.find(x=>x.id===sel) || canales[0];
+  const despiezar = ()=>{
+    setCanales(cs=>cs.map(c=>c.id===sel ? { ...c, disp:Math.max(0, c.disp-n) } : c));
+    window.__cgGo && window.__cgGo("bascula");
+  };
   return (
     <div>
       <ScreenHead title="Despiece" desc="Los canales vienen de la Compra del día. Elige un tipo y despiézalo según lo que se pidió."
-        right={<><Btn kind="dark" icon="scissors">Despiezar</Btn><Btn kind="outline" icon="git-branch">Recetas</Btn></>} />
+        right={<><Btn kind="dark" icon="scissors" onClick={despiezar}>Despiezar</Btn><Btn kind="outline" icon="git-branch" onClick={()=>window.__cgGo&&window.__cgGo("recetas")}>Recetas</Btn></>} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:12, marginBottom:16 }}>
-        {d.canales.map(cn=>{
+        {canales.map(cn=>{
           const on = cn.id===sel;
           return (
             <button key={cn.id} onClick={()=>setSel(cn.id)} style={{ textAlign:"left", cursor:"pointer",
@@ -51,7 +56,7 @@ function DespieceScreen({ ai }) {
               <span style={{ width:34, textAlign:"center", font:`700 16px/1 ${Fb.mono}`, color:Cb.ink }}>{n}</span>
               <Step icon="plus" onClick={()=>setN(v=>v+1)} />
             </div>
-            <Btn kind="primary" icon="scissors">Despiezar {n}</Btn>
+            <Btn kind="primary" icon="scissors" onClick={despiezar}>Despiezar {n}</Btn>
           </div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:11 }}>
@@ -87,14 +92,18 @@ function BasculaScreen({ ai }) {
   const b = Db.bascula;
   const [rec, setRec] = useState("ninguno");
   const [bruto, setBruto] = useState("");
+  const [idx, setIdx] = useState(b.item.idx);
+  const [pes, setPes] = useState(false);
   const recDef = b.recipientes.find(r=>r.id===rec);
   const tara = recDef.tara ?? 0;
   const g = parseFloat(bruto)||0;
   const neto = Math.max(0, g - tara);
+  const goTo = (m)=> window.__cgGo && window.__cgGo(m);
+  const registrar = ()=>{ setBruto(""); if (idx>=b.item.total) goTo("cobro"); else setIdx(i=>i+1); };
   return (
     <div>
       <ScreenHead title="Báscula" desc="Estación de pesaje. Pensada para tablet y dedos: número gigante, recipientes con un toque, Enter registra."
-        right={<Btn kind="outline" icon="scale">Agregar pesaje a producto</Btn>} />
+        right={<Btn kind="outline" icon="scale" onClick={()=>setPes(true)}>Agregar pesaje a producto</Btn>} />
       <Slot id="bascula" ai={ai} />
       <div style={{ display:"grid", gridTemplateColumns:"320px 1fr", gap:14, alignItems:"start" }} className="cg-two-col">
         {/* cola */}
@@ -124,7 +133,7 @@ function BasculaScreen({ ai }) {
               <div style={{ font:`500 12px/1 ${Fb.ui}`, color:Cb.inkSoft, marginTop:4 }}>Pedido #{b.pedido.id}</div>
             </div>
             <div style={{ display:"flex", gap:14, alignItems:"center" }}>
-              <Btn kind="outline" size="sm" icon="pencil">Editar pedido</Btn>
+              <Btn kind="outline" size="sm" icon="pencil" onClick={()=>goTo("pedidos")}>Editar pedido</Btn>
               <div style={{ textAlign:"right" }}>
                 <Overline>Total</Overline>
                 <div style={{ font:`400 22px/1 ${Fb.display}`, color:Cb.ink, marginTop:3 }}>{money(b.pedido.total)}</div>
@@ -132,7 +141,7 @@ function BasculaScreen({ ai }) {
             </div>
           </div>
           <div style={{ textAlign:"center", marginBottom:18 }}>
-            <Overline color={Cb.red} style={{ marginBottom:6 }}>Artículo {b.item.idx} de {b.item.total}</Overline>
+            <Overline color={Cb.red} style={{ marginBottom:6 }}>Artículo {idx} de {b.item.total}</Overline>
             <div style={{ font:`400 46px/0.95 ${Fb.display}`, color:Cb.ink, letterSpacing:"0.01em" }}>
               <span style={{ color:Cb.inkSoft, fontSize:30 }}>{1}&nbsp;</span>{b.item.nombre}
             </div>
@@ -155,7 +164,7 @@ function BasculaScreen({ ai }) {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:9 }}>
             <Overline>Peso bruto (kg)</Overline>
             <div style={{ display:"flex", gap:7 }}>
-              <MiniTag label="CAPTURAR" onClick={()=>{ if(g>0){ setRec("otro"); } }} />
+              <MiniTag label="CAPTURAR" onClick={()=>{ if(!(parseFloat(bruto)>0)) setBruto("19.700"); }} />
               <MiniTag label="TARE" onClick={()=>setBruto("")} dark />
             </div>
           </div>
@@ -176,14 +185,18 @@ function BasculaScreen({ ai }) {
             </div>
           )}
           <div style={{ display:"flex", gap:11 }}>
-            <Btn kind="outline" size="lg" style={{ flex:1, minHeight:62 }} icon="chevron-left">Anterior</Btn>
-            <Btn kind="primary" size="lg" style={{ flex:3, minHeight:62, fontSize:18 }} icon="scale">
+            <Btn kind="outline" size="lg" style={{ flex:1, minHeight:62 }} icon="chevron-left"
+              onClick={()=> idx<=1 ? goTo("pedidos") : setIdx(i=>i-1)}>Anterior</Btn>
+            <Btn kind="primary" size="lg" style={{ flex:3, minHeight:62, fontSize:18 }} icon="scale" onClick={registrar}>
               Registrar {neto>0?`${neto.toFixed(3)} kg`:"peso"}
             </Btn>
-            <Btn kind="outline" size="lg" style={{ flex:1, minHeight:62 }} icon="chevron-right">Siguiente</Btn>
+            <Btn kind="outline" size="lg" style={{ flex:1, minHeight:62 }} icon="chevron-right"
+              onClick={()=> idx>=b.item.total ? goTo("cobro") : setIdx(i=>i+1)}>Siguiente</Btn>
           </div>
         </Card>
       </div>
+      <PesajeModal open={pes} producto={{ n:b.item.nombre, pedido:`#${b.pedido.id}`, precio:0 }}
+        onClose={()=>setPes(false)} onRegister={()=>setPes(false)} />
     </div>
   );
 }
@@ -204,6 +217,9 @@ function CobroScreen({ ai }) {
   const c = Db.cobro;
   const [modo, setModo] = useState("contado");
   const [precio, setPrecio] = useState(0);
+  const [metodo, setMetodo] = useState("Efectivo");
+  const cicloMetodo = ()=>{ const ps = window.CG.config.payment || ["Efectivo","Tarjeta","Transferencia"];
+    const i = ps.indexOf(metodo); setMetodo(ps[(i+1)%ps.length]); };
   const linea = c.pedido.lineas[0];
   const total = linea.kg * precio;
   return (
@@ -265,13 +281,14 @@ function CobroScreen({ ai }) {
                 border:`1.5px solid ${on?(id==="contado"?Cb.green:Cb.red):Cb.line}` }}>{lab}</button>;
             })}
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cb.line}`, borderRadius:11,
-            padding:"13px 14px", marginBottom:14, background:Cb.paper2 }}>
+          <div onClick={cicloMetodo} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cb.line}`, borderRadius:11,
+            padding:"13px 14px", marginBottom:14, background:Cb.paper2, cursor:"pointer" }}>
             <Icon name="wallet" size={16} color={Cb.inkSoft} />
-            <span style={{ font:`600 14px/1 ${Fb.ui}`, color:Cb.ink }}>Efectivo</span>
+            <span style={{ font:`600 14px/1 ${Fb.ui}`, color:Cb.ink }}>{metodo}</span>
             <Icon name="chevron-down" size={16} color={Cb.inkFaint} style={{ marginLeft:"auto" }} />
           </div>
           <Btn kind={total>0?"green":"outline"} size="xl" block icon="receipt-text"
+            onClick={ total>0 ? ()=>window.__cgGo&&window.__cgGo("pedidos") : undefined }
             style={ total>0?{}:{ background:Cb.paper2, color:Cb.inkFaint, cursor:"not-allowed" } }>
             Cobrar {money(total)}
           </Btn>
