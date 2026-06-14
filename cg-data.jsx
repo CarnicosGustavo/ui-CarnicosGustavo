@@ -503,3 +503,43 @@ CG.chat = {
     "default": "Entendido. Estoy revisando el estado del sistema para esa consulta — en la versión conectada te respondo con los datos reales de Supabase y, si me lo pides y confirmas, ejecuto la acción por ti.",
   },
 };
+
+/* ===========================================================================
+   HIDRATACIÓN DESDE SUPABASE (Hito 2)
+   Trae datos reales de /api/cg-data (función serverless con service-role) y los
+   FUSIONA sobre los mock de arriba (mismas claves). Si la API no responde, la
+   app conserva los datos de ejemplo — nunca se rompe. Al llegar los datos,
+   dispara "cg:data" y la app se vuelve a renderizar.
+   =========================================================================== */
+CG.dataReady = false;
+function cgDeepMerge(target, src) {
+  if (!src || typeof src !== "object") return target;
+  for (var k in src) {
+    if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
+    var v = src[k];
+    if (
+      v && typeof v === "object" && !Array.isArray(v) &&
+      target[k] && typeof target[k] === "object" && !Array.isArray(target[k])
+    ) {
+      cgDeepMerge(target[k], v);
+    } else {
+      target[k] = v; // arrays y primitivos: reemplazo directo
+    }
+  }
+  return target;
+}
+CG.refresh = function () {
+  return fetch("/api/cg-data", { headers: { accept: "application/json" } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (payload) {
+      if (!payload || payload._source === "mock") return;
+      if (payload.data) cgDeepMerge(CG.data, payload.data);
+      if (payload.config) cgDeepMerge(CG.config, payload.config);
+      if (payload.ops) cgDeepMerge(CG.ops, payload.ops);
+      if (payload.recetas) cgDeepMerge(CG.recetas, payload.recetas);
+      CG.dataReady = true;
+      window.dispatchEvent(new Event("cg:data"));
+    })
+    .catch(function () { /* sin conexión: se conservan los mock */ });
+};
+if (typeof window !== "undefined" && typeof window.fetch === "function") CG.refresh();

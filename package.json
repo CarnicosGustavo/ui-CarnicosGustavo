@@ -12,6 +12,9 @@
     "preview": "vite preview",
     "test": "node scripts/build-cg.mjs && node scripts/smoke-test.mjs"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10"
+  },
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/preset-env": "^7.26.0",

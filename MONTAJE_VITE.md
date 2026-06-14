@@ -35,13 +35,23 @@ npm test          # smoke test: monta la app en jsdom y verifica que renderiza
 
 - **Hito 1 ✅** — montaje en Vite, pixel idéntico, con los **datos mock** actuales
   de `cg-data.jsx`. Verificado: `npm test` monta `<App/>` y renderiza sin errores.
-- **Hito 2 (pendiente)** — reescribir **solo `cg-data.jsx`** para llenar `CG.*`
-  (`CG.data`, `CG.config`, `CG.ops`, `CG.recetas`, `CG.antonella`, `CG.chat`)
-  desde **Supabase**, manteniendo las mismas claves.
-  - Acordado: los datos llegan vía una **función serverless** (Vercel) que lee
-    Supabase con la *service-role key* del lado servidor y devuelve el JSON ya con
-    forma `CG.*`. `cg-data.jsx` solo hace `fetch('/api/cg-data')`. El secreto nunca
-    llega al navegador y no hay que tocar RLS.
+- **Hito 2 (en curso)** — datos reales desde **Supabase** vía función serverless.
+  - `api/cg-data.js` (Vercel) lee Supabase con la *service-role key* del lado
+    servidor y devuelve JSON con forma `CG.*`. El secreto nunca llega al navegador.
+  - `cg-data.jsx` hace `CG.refresh()` → `fetch('/api/cg-data')` y **fusiona** sobre
+    los mock (mismas claves). Si la API no responde, conserva los mock.
+  - Al llegar los datos dispara `cg:data` y la app se re-renderiza.
+  - **Mapeado hasta ahora:** `config.productos`, `ops.clientes`, `ops.cobranza`,
+    `ops.pedidos`. Pendiente: panel, despiece, bascula, cobro, precios, recetas.
+  - **Variables de entorno en Vercel** (Production/Preview/Development):
+    - `SUPABASE_URL` = `https://uajezdrnqujmutjokwfo.supabase.co`
+    - `SUPABASE_SERVICE_ROLE_KEY` = (secreto — solo en Vercel, nunca en el repo)
+    - `CG_USER_UID` = (opcional) filtra por dueño; si se omite, lee todo.
+
+### Funcionalidad de botones (Fase 2)
+Cada botón ejecuta una acción real (navega / abre modal / calcula / guarda).
+Ningún botón de acción "solo abre el chat". Los botones que **sí** envían al chat
+de iAntonella (chips de sugerencia) llevan un **icono de flecha hacia el chat**.
 
 ## Deploy (Vercel)
 

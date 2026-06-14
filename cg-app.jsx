@@ -227,6 +227,14 @@ function App() {
     document.body.style.background = window.CG.color.bg;
   }, []);
 
+  // Re-render cuando llegan los datos reales de Supabase (CG.refresh → "cg:data")
+  const [, setDataV] = useState(0);
+  useEffect(()=>{
+    const h = ()=> setDataV(x=>x+1);
+    window.addEventListener("cg:data", h);
+    return ()=> window.removeEventListener("cg:data", h);
+  }, []);
+
   const setTheme = (p, m)=>{
     window.CG.applyTheme(p, m);
     localStorage.setItem("cg_palette", p); localStorage.setItem("cg_mode", m);
