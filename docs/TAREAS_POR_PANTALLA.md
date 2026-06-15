@@ -10,8 +10,16 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ Assets servidos desde `public/assets/` (antes 404 en deploy)
 - ✅ Datos reales vía `/api/cg-data` (lectura); `CG.write` (escritura)
 - 🔧 Avatar/Perfil del header → abre Perfil (ok); revisar menú de usuario
+- ✅ **Notificaciones in-app** (campana en el header, `cg-notifs.jsx`): badge de no
+  leídas + panel; avisos derivados del estado real (pesajes pendientes, listos para
+  cobro, saldos vencidos, faltantes). Cada aviso navega (Ir) o pregunta a Antonella.
+  'Leído' en localStorage; sincroniza el punto rojo de Ramón.
 - ✅ Antonella (dock/chat): `CG.ask`→`/api/antonella` (Anthropic real si hay
-  `ANTHROPIC_API_KEY`; si no, usa respuesta mock). Falta tool-use/executeAction (M1)
+  `ANTHROPIC_API_KEY`; si no, mock). **Con datos reales**: `CG.buildContext()` manda un
+  snapshot (KPIs del día, pedidos por estado, saldos vencidos, faltantes) inyectado en
+  el system prompt → responde con cifras concretas. **Acciones**: navega (`a.go`) y puede
+  ejecutar ops (`a.op`) con PIN si es sensible (`a.auth`).
+- ⏳ tool-use estructurado (que el modelo elija la acción/op) — siguiente paso
 
 ## Panel
 - ✅ Lectura (KPIs, categorías, flujo) · ✅ ocultar/mostrar montos

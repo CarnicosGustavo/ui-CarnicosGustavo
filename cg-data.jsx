@@ -550,11 +550,28 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") CG.refr
 
 // iAntonella: POST /api/antonella { question, module }. Devuelve texto real si hay
 // ANTHROPIC_API_KEY en el servidor; si no, resuelve null y el chat usa su respuesta mock.
+// Snapshot compacto del estado REAL para fundamentar las respuestas de iAntonella.
+CG.buildContext = function () {
+  try {
+    var O = CG.ops || {}, P = O.panel || {}, peds = O.pedidos || [];
+    var porPesar = peds.filter(function (p) { return /pesar|pesaje/i.test(p.estado || ""); }).length;
+    var listos = peds.filter(function (p) { return /lista para cobro/i.test(p.estado || ""); }).length;
+    var venc = (O.cobranza || []).filter(function (c) { return (c.dias || 0) > 0 && (c.saldo || 0) > 0; });
+    var falt = ((((O.pos || {}).catalogo) || []).filter(function (it) { return it.disp === "faltante"; })).map(function (it) { return it.n; });
+    var L = [];
+    if (P.ingresos != null) L.push("Hoy — ingresos $" + P.ingresos + ", gastos $" + (P.gastos || 0) + ", ganancia $" + (P.ganancia || 0) + " (margen " + (P.margen || 0) + "%).");
+    L.push("Pedidos: " + peds.length + " en lista, " + porPesar + " por pesar, " + listos + " listos para cobro.");
+    if (venc.length) L.push("Saldos vencidos: " + venc.map(function (c) { return c.cliente + " $" + c.saldo + " (" + c.dias + "d)"; }).join("; ") + ".");
+    if (falt.length) L.push("Faltantes: " + falt.join(", ") + ".");
+    return L.join("\n");
+  } catch (e) { return ""; }
+};
+
 CG.ask = function (question, module) {
   return fetch("/api/antonella", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ question: question, module: module || "panel" }),
+    body: JSON.stringify({ question: question, module: module || "panel", context: CG.buildContext() }),
   })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { return d && d.text ? d.text : null; })

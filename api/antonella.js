@@ -22,7 +22,14 @@ export default async function handler(req, res) {
 	if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
 	const question = String((body && body.question) || "").slice(0, 2000);
 	const moduleId = String((body && body.module) || "panel");
+	const context = String((body && body.context) || "").slice(0, 1500);
 	if (!question) return res.status(400).json({ error: "question requerida" });
+
+	let system = SYSTEM + ` Módulo actual del usuario: ${moduleId}.`;
+	if (context) {
+		system += "\n\nESTADO ACTUAL DEL SISTEMA (datos reales del día — úsalos para responder con " +
+			"cifras concretas; no inventes otras):\n" + context;
+	}
 
 	try {
 		const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -30,7 +37,7 @@ export default async function handler(req, res) {
 			headers: { "content-type": "application/json", "x-api-key": KEY, "anthropic-version": "2023-06-01" },
 			body: JSON.stringify({
 				model: MODEL, max_tokens: 600,
-				system: SYSTEM + ` Módulo actual del usuario: ${moduleId}.`,
+				system,
 				messages: [{ role: "user", content: question }],
 			}),
 		});
