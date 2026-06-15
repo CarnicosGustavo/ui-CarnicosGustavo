@@ -12,9 +12,15 @@ function NotificationCenter({ open, onClose }) {
     { id:3, tipo:"aviso", titulo:"Saldo vencido", desc:"Abarrotes El Sol vence hoy. Recordatorio enviado.", time:"hace 2 horas", read:true },
   ]);
 
+  // Carga avisos REALES del endpoint (api/notifications) cuando hay datos; si no, deja el ejemplo.
+  useEffect(()=>{ if(open && window.CG && window.CG.notifications && typeof fetch !== "undefined") window.CG.notifications().then(function(items){
+    if(items && items.length) setNotifs(items.map(function(n){ return { id:n.id, tipo:n.tipo, titulo:n.titulo, desc:n.desc, time:n.time||"hoy", href:n.href, read:false }; }));
+  }); }, [open]);
+
   const markAsRead = (id) => {
     setNotifs(ns => ns.map(n => n.id === id ? {...n, read:true} : n));
   };
+  const onNotif = (n) => { markAsRead(n.id); if(n.href && window.__cgGo){ onClose && onClose(); window.__cgGo(n.href); } };
 
   const unread = notifs.filter(n => !n.read).length;
 
@@ -39,7 +45,7 @@ function NotificationCenter({ open, onClose }) {
         {notifs.length > 0 ? (
           <div style={{ padding:"12px" }}>
             {notifs.map(n => (
-              <button key={n.id} onClick={()=>markAsRead(n.id)} style={{ width:"100%", textAlign:"left", padding:"12px 14px", marginBottom:8,
+              <button key={n.id} onClick={()=>onNotif(n)} style={{ width:"100%", textAlign:"left", padding:"12px 14px", marginBottom:8,
                 borderRadius:10, border:`1px solid ${n.read?"#eee":"#c41e3a"}`, background: n.read?"#f9f9f9":"#fff3f5",
                 cursor:"pointer" }}>
                 <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>

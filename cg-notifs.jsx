@@ -45,18 +45,29 @@ const NOTIF_TONE = {
   green: { dot: Cnf.green || "#3C7A4E", wash: "#e9f3ec" },
 };
 
+// Mapea el aviso REAL del endpoint ({id,tipo,titulo,desc,href,time}) a la forma del bell.
+function mapServerNotif(n) {
+  const byId = { cobranza: { tone: "red", icon: "hand-coins" }, pesaje: { tone: "amber", icon: "scale" },
+    cobro: { tone: "blue", icon: "hand-coins" }, despiece: { tone: "blue", icon: "scissors" } };
+  const byTipo = { alerta: { tone: "red", icon: "alert-triangle" }, aviso: { tone: "amber", icon: "bell" }, info: { tone: "blue", icon: "info" } };
+  const m = byId[n.id] || byTipo[n.tipo] || { tone: "blue", icon: "bell" };
+  return { id: n.id, tone: m.tone, icon: m.icon, title: n.titulo, text: n.desc, go: n.href, ask: "¿Qué hago con: " + (n.titulo || "") + "?" };
+}
+
 // Campana del header con badge de no leídas + panel desplegable.
 function NotifBell() {
   const [open, setOpen] = useState(false);
-  const [, bump] = useState(0);
   const [seen, setSeen] = useState(window.CG.notifSeen());
+  const [server, setServer] = useState(null); // null=cargando, []=sin avisos, [...]=reales
   useEffect(function () {
-    const h = function () { bump(function (x) { return x + 1; }); };
-    window.addEventListener("cg:data", h);
-    window.addEventListener("cg:notif", h);
-    return function () { window.removeEventListener("cg:data", h); window.removeEventListener("cg:notif", h); };
+    const load = function () { if (window.CG.notifications && typeof fetch !== "undefined") window.CG.notifications().then(function (items) { setServer(items || []); }); else setServer([]); };
+    load();
+    window.addEventListener("cg:data", load);
+    window.addEventListener("cg:notif", load);
+    return function () { window.removeEventListener("cg:data", load); window.removeEventListener("cg:notif", load); };
   }, []);
-  const notifs = window.CG.buildNotifs();
+  // Prioriza avisos reales del endpoint; si no hay, deriva del estado local (mock).
+  const notifs = (server && server.length) ? server.map(mapServerNotif) : window.CG.buildNotifs();
   const unread = notifs.filter(function (n) { return seen.indexOf(n.id) < 0; });
   // Sincroniza el punto rojo de Ramón con avisos sin leer.
   useEffect(function () { if (window.CG.ramon && window.CG.ramon.setAlert) window.CG.ramon.setAlert(unread.length > 0); });

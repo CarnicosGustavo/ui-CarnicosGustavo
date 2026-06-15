@@ -20,6 +20,12 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   el system prompt → responde con cifras concretas. **Acciones**: navega (`a.go`) y puede
   ejecutar ops (`a.op`) con PIN si es sensible (`a.auth`).
 - ⏳ tool-use estructurado (que el modelo elija la acción/op) — siguiente paso
+- ✅ **Herramienta de feedback in-browser** (`cg-feedback.jsx`, estilo Vercel Toolbar):
+  modo "Comentar" deja pins con nota+tipo (Bug/Idea/Usabilidad/Nota), captura elemento y
+  pantalla, panel con lista y **Exportar informe** (.md + portapapeles). localStorage.
+- ✅ Campana del header consume avisos **reales** (`/api/notifications`) con fallback a
+  derivados de `CG.ops`; `NotificationCenter` (config-antonella) también cableado al real.
+- ⏳ **Dashboard de Configuración** ("tipo tweaks") — plan en `docs/PLAN_CONFIG_DASHBOARD.md`
 
 ## Panel
 - ✅ Lectura (KPIs, categorías, flujo) · ✅ ocultar/mostrar montos
