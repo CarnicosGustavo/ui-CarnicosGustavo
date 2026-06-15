@@ -128,22 +128,36 @@ function PosScreen({ ai }) {
   const faltan = cart.filter(it=>it.disp==="faltante").length;
   const despiece = cart.filter(it=>it.disp==="despiece").length;
 
-  // Agregar al carrito (acción central del POS)
+  // Agregar al carrito (acción central del POS) — conserva el id del producto
   const addItem = (it)=> setCart(c=>{
     const i = c.findIndex(x=>x.n===it.n);
     if (i>=0){ const n=[...c]; n[i]={ ...n[i], pz:n[i].pz+1 }; return n; }
-    return [...c, { n:it.n, precio:it.precio, disp:it.disp, pz:1, kg:0 }];
+    return [...c, { id:it.id, n:it.n, precio:it.precio, disp:it.disp, pz:1, kg:0 }];
   });
-  // Selects de la venta (cliente / método / lista) — ciclan opciones reales
-  const clientes = (OPSd.clientes||[]).map(c=>c.nombre);
+  // Selects de la venta (cliente objeto / método / lista)
+  const clientes = OPSd.clientes || [];
   const metodos = window.CG.config.payment || ["Efectivo","Tarjeta","Transferencia"];
   const listas = p.listas || ["Mayoreo contado"];
-  const [cli, setCli] = useState(clientes[0] || "Cliente");
+  const [cli, setCli] = useState(clientes[0] || null);
   const [pago, setPago] = useState(metodos[0]);
   const [lista, setLista] = useState(listas[0]);
   const [factura, setFactura] = useState(false);
   const cycle = (arr, cur, set)=>{ const i=arr.indexOf(cur); set(arr[(i+1)%arr.length]); };
-  const crearPedido = ()=> window.__cgGo && window.__cgGo(needWeigh ? "bascula" : "cobro");
+  const cycleCli = ()=>{ if(!clientes.length) return; const i=clientes.findIndex(x=>x===cli); setCli(clientes[(i+1)%clientes.length]); };
+  const crearPedido = ()=>{
+    if (!cart.length) return;
+    if (cli && cli.id && window.CG.write) {
+      const items = cart.map((it)=>({ productId:it.id||null, productName:it.n, pieces:it.pz,
+        kg:it.kg||0, price:it.precio, byWeight: it.disp==="pesaje" }));
+      window.CG.write("order.create", { customerId:cli.id, items })
+        .then(function(r){
+          if (r && r.ok && window.CG.refresh) window.CG.refresh();
+          window.__cgGo && window.__cgGo(needWeigh ? "bascula" : "cobro");
+        });
+    } else {
+      window.__cgGo && window.__cgGo(needWeigh ? "bascula" : "cobro");
+    }
+  };
 
   return (
     <div>
@@ -155,7 +169,7 @@ function PosScreen({ ai }) {
           <Card>
             <Overline style={{ marginBottom:12 }}>Detalles de la venta</Overline>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10 }}>
-              <PosSelect icon="user" label={cli} onClick={()=>cycle(clientes, cli, setCli)} />
+              <PosSelect icon="user" label={cli ? cli.nombre : "Cliente"} onClick={cycleCli} />
               <PosSelect icon="wallet" label={pago} onClick={()=>cycle(metodos, pago, setPago)} />
               <PosSelect icon="tag" label={lista} onClick={()=>cycle(listas, lista, setLista)} />
             </div>

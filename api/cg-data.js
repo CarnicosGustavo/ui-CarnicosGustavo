@@ -100,6 +100,7 @@ export default async function handler(req, res) {
 			.filter((p) => p.is_sellable_by_unit || p.is_sellable_by_weight)
 			.slice(0, 40)
 			.map((p) => ({
+				id: p.id,
 				n: p.name,
 				precio: num(p.price_per_kg ?? p.price_per_piece),
 				disp: dispOf(p),

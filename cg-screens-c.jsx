@@ -167,7 +167,16 @@ function PedidosScreen({ ai }) {
       <NuevoPedidoModal open={nuevoPedido} onClose={()=>setNuevoPedido(false)}
         onCreate={(o)=>{ const id = 360 + extra.length;
           setExtra(arr => [{ id, cliente:o.cliente, total:o.total, items:o.items.length,
-            estado: o.items.some(x=>x.disp==="pesaje"||x.disp==="despiece")?"Por pesar":"Lista para cobro", fecha:"12/06" }, ...arr]); }} />
+            estado: o.items.some(x=>x.disp==="pesaje"||x.disp==="despiece")?"Por pesar":"Lista para cobro", fecha:"12/06" }, ...arr]);
+          const cust = (window.CG.ops.clientes||[]).find(c=>c.nombre===o.cliente);
+          if (cust && window.CG.write) {
+            const cat = (window.CG.ops.pos && window.CG.ops.pos.catalogo) || [];
+            const items = o.items.map(it=>{ const pr = cat.find(c=>c.n===it.n);
+              return { productId: pr?pr.id:null, productName:it.n, pieces:it.pz, kg:0, price:it.precio, byWeight: it.disp==="pesaje" }; });
+            window.CG.write("order.create", { customerId:cust.id, items })
+              .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+          }
+        }} />
       <PesajeModal open={!!pesaje} producto={pesaje} onClose={()=>setPesaje(null)}
         onRegister={()=>{}} />
     </div>

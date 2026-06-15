@@ -185,6 +185,46 @@ export default async function handler(req, res) {
 				return ok({ saved });
 			}
 
+			// ---------- PEDIDOS: crear (POS / Nuevo pedido) ----------
+			// Inserta order + order_items. NO descuenta inventario (eso ocurre al
+			// cobrar). Estado: PENDIENTE_PESAJE si hay piezas por pesar, si no
+			// LISTA_PARA_COBRO. Montos en centavos.
+			case "order.create": {
+				if (!p.customerId || !Array.isArray(p.items) || !p.items.length)
+					return fail("customerId e items[] requeridos");
+				const needWeigh = p.items.some((it) => it.byWeight && !(Number(it.kg) > 0));
+				const rows = p.items.map((it) => {
+					const unit = Math.round(Number(it.price || 0) * 100); // centavos
+					const pieces = Math.max(0, parseInt(it.pieces || 0, 10));
+					const kg = Number(it.kg || 0);
+					const itemWeigh = it.byWeight && !(kg > 0);
+					const sub = kg > 0 ? Math.round(unit * kg) : unit * pieces;
+					return {
+						product_id: it.productId || null,
+						product_name: it.productName || "Producto",
+						quantity_pieces: pieces || null,
+						quantity_kg: kg > 0 ? Math.round(kg * 1000) : null, // gramos
+						unit_price: unit,
+						subtotal: sub,
+						status: itemWeigh ? "PENDIENTE_PESAJE" : "COMPLETADO",
+					};
+				});
+				const total = rows.reduce((s, r) => s + r.subtotal, 0);
+				const { data: ord, error } = await db.from("orders").insert({
+					customer_id: p.customerId,
+					status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO",
+					total_amount: total,
+					user_uid: USER_UID,
+					requires_weighing: needWeigh,
+				}).select("id").single();
+				if (error) throw error;
+				for (const r of rows) {
+					const { error: ie } = await db.from("order_items").insert({ ...r, order_id: ord.id });
+					if (ie) throw ie;
+				}
+				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
+			}
+
 			default:
 				return fail(`Operación desconocida: ${op}`, 400);
 		}
