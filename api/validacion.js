@@ -27,10 +27,18 @@ export default async function handler(req, res) {
 		let body = req.body;
 		if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
 		const { op, customerId, usuario } = body || {};
-		if (op !== "validate" || !customerId) return res.status(400).json({ error: "op:'validate' y customerId requeridos" });
-		const { error } = await db.rpc("validar_saldo_legacy", { p_customer_id: Number(customerId), p_usuario: usuario || "sistema" });
+		if (!customerId || !["validate", "import"].includes(op))
+			return res.status(400).json({ error: "op:'validate'|'import' y customerId requeridos" });
+		if (op === "validate") {
+			const { error } = await db.rpc("validar_saldo_legacy", { p_customer_id: Number(customerId), p_usuario: usuario || "sistema" });
+			if (error) return res.status(500).json({ error: error.message });
+			return res.status(200).json({ ok: true, customerId });
+		}
+		// import → crea el cargo "Saldo inicial" en cobranza (atómico, vía RPC).
+		// Requiere que el saldo esté VALIDADO y no haber sido importado antes.
+		const { data, error } = await db.rpc("importar_saldo_legacy", { p_customer_id: Number(customerId), p_usuario: usuario || "sistema" });
 		if (error) return res.status(500).json({ error: error.message });
-		return res.status(200).json({ ok: true, customerId });
+		return res.status(200).json(data || { ok: false });
 	}
 
 	// Lectura
@@ -51,8 +59,8 @@ export default async function handler(req, res) {
 			.map((c) => ({
 				id: c.id, customerId: c.customer_id, nombre: c.nombre,
 				saldo: num(c.saldo), limite: num(c.limite), dias: num(c.dias),
-				ndoc: num(c.ndoc), validado: !!c.validado,
-				validadoPor: c.validado_por || null, validadoAt: c.validado_at || null,
+				ndoc: num(c.ndoc), validado: !!c.validado, importado: !!c.importado,
+				validadoPor: c.validado_por || null, validadoAt: c.validado_at || null, importadoAt: c.importado_at || null,
 				docs: (byCust[c.customer_id] || []).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))),
 			}))
 			.sort((a, b) => b.saldo - a.saldo); // mayores adeudos primero
