@@ -19,6 +19,82 @@ const USER_UID = process.env.CG_USER_UID || "system";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// === Fase 0: integridad de inventario (réplica de la lógica de M1) ===
+
+// Descuenta inventario por una venta. Por cada order_item con product_id baja
+// stock_pieces y stock_kg y registra una transacción VENTA. OJO: en ui-CG
+// order_items.quantity_kg está en GRAMOS (kg×1000); stock_kg está en kg.
+async function deductInventoryForOrder(db, orderId) {
+	const { data: items } = await db
+		.from("order_items")
+		.select("product_id, quantity_pieces, quantity_kg")
+		.eq("order_id", orderId);
+	for (const it of items || []) {
+		if (!it.product_id) continue;
+		const { data: prod } = await db
+			.from("products")
+			.select("stock_pieces, weighed_pieces, stock_kg")
+			.eq("id", it.product_id)
+			.single();
+		if (!prod) continue;
+		const kg = it.quantity_kg ? Number(it.quantity_kg) / 1000 : 0; // gramos→kg
+		const pieces = it.quantity_pieces ? Number(it.quantity_pieces) : 0;
+		const nextPieces = pieces ? Number(prod.stock_pieces || 0) - pieces : Number(prod.stock_pieces || 0);
+		const nextWeighed = Math.max(0, Math.min(Number(prod.weighed_pieces || 0), nextPieces));
+		const nextKg = Number(prod.stock_kg || 0) - kg; // puede quedar negativo: se compensa al despiezar
+		await db.from("products").update({
+			stock_pieces: nextPieces,
+			weighed_pieces: nextWeighed,
+			stock_kg: nextKg.toFixed(3),
+		}).eq("id", it.product_id);
+		await db.from("inventory_transactions").insert({
+			product_id: it.product_id,
+			quantity_change_pieces: pieces ? -pieces : null,
+			quantity_change_kg: kg > 0 ? (-kg).toFixed(3) : null,
+			transaction_type: "VENTA",
+			reference_id: orderId,
+			notes: `Venta pedido #${orderId}`,
+		});
+	}
+}
+
+// Recalcula el stock de los canales: comprado (todas las fechas) − despiezado.
+// Idempotente: re-guardar la compra no genera doble conteo. Réplica de M1.
+async function syncCanalStock(db, uid) {
+	const { data: purch } = await db
+		.from("channel_purchases")
+		.select("qty_americano, qty_nacional")
+		.eq("user_uid", uid);
+	let amer = 0, nac = 0;
+	for (const r of purch || []) { amer += Number(r.qty_americano) || 0; nac += Number(r.qty_nacional) || 0; }
+	const { data: canales } = await db
+		.from("products")
+		.select("id, name, avg_weight_per_piece_kg")
+		.eq("user_uid", uid)
+		.eq("is_parent_product", true)
+		.ilike("name", "CANAL%");
+	if (!canales || !canales.length) return;
+	const { data: used } = await db
+		.from("inventory_transactions")
+		.select("product_id, quantity_change_pieces")
+		.eq("transaction_type", "DESPIECE");
+	const usedMap = {};
+	for (const u of used || []) {
+		const pid = Number(u.product_id);
+		usedMap[pid] = (usedMap[pid] || 0) + (-(Number(u.quantity_change_pieces) || 0));
+	}
+	for (const c of canales) {
+		const n = String(c.name).toUpperCase();
+		const purchased = n.includes("AMERICANO") ? amer : n.includes("NACIONAL") ? nac : 0;
+		const stock = purchased - (usedMap[Number(c.id)] || 0);
+		const avg = Number(c.avg_weight_per_piece_kg) || 0;
+		await db.from("products").update({
+			stock_pieces: stock,
+			stock_kg: (stock * avg).toFixed(3),
+		}).eq("id", c.id);
+	}
+}
+
 export default async function handler(req, res) {
 	if (req.method !== "POST")
 		return res.status(405).json({ error: "Método no permitido" });
@@ -226,8 +302,8 @@ export default async function handler(req, res) {
 			}
 
 			// ---------- COMPRA DEL DÍA (channel_purchases) ----------
-			// Reemplaza las compras de HOY del usuario. No re-sincroniza stock de
-			// canales (a validar; la lógica de M1 lo hace).
+			// Reemplaza las compras de HOY del usuario y RE-SINCRONIZA el stock de
+			// canales (comprado − despiezado), idéntico a M1. Idempotente.
 			case "purchases.save": {
 				if (!Array.isArray(p.rows)) return fail("rows[] requerido");
 				const d = today();
@@ -244,6 +320,7 @@ export default async function handler(req, res) {
 					});
 					if (error) throw error;
 				}
+				await syncCanalStock(db, USER_UID);
 				return ok({ saved: p.rows.length });
 			}
 
@@ -305,6 +382,11 @@ export default async function handler(req, res) {
 			case "order.priceAndCharge": {
 				if (!p.orderId || !Array.isArray(p.items) || !p.items.length)
 					return fail("orderId e items[] requeridos");
+				// Estado previo: si ya estaba COMPLETADA, NO se vuelve a descontar
+				// inventario (evita doble baja en re-cobros).
+				const { data: ordPrev } = await db.from("orders")
+					.select("status, customer_id").eq("id", p.orderId).single();
+				const alreadyCharged = ordPrev?.status === "COMPLETADA";
 				let total = 0;
 				for (const it of p.items) {
 					const { data: oi } = await db.from("order_items")
@@ -315,11 +397,12 @@ export default async function handler(req, res) {
 					total += sub;
 					await db.from("order_items").update({ unit_price: unit, subtotal: sub, status: "COMPLETADO" }).eq("id", it.orderItemId);
 				}
+				// Descuento de inventario (réplica de M1 completeOrderPayment).
+				if (!alreadyCharged) await deductInventoryForOrder(db, p.orderId);
 				await db.from("orders").update({ total_amount: total, status: "COMPLETADA" }).eq("id", p.orderId);
-				const { data: ord } = await db.from("orders").select("customer_id").eq("id", p.orderId).single();
 				if (p.paymentType === "credito") {
-					if (ord?.customer_id) await db.from("credit_charges").insert({
-						customer_id: ord.customer_id, amount: (total / 100).toFixed(2),
+					if (ordPrev?.customer_id) await db.from("credit_charges").insert({
+						customer_id: ordPrev.customer_id, amount: (total / 100).toFixed(2),
 						concept: `Pedido #${p.orderId}`, source: "pedido", order_id: p.orderId, charge_date: today(),
 					});
 				} else {
@@ -328,7 +411,7 @@ export default async function handler(req, res) {
 						category: "Ventas", status: "completed", user_uid: USER_UID, order_id: p.orderId,
 					});
 				}
-				return ok({ orderId: p.orderId, total });
+				return ok({ orderId: p.orderId, total, inventoryDeducted: !alreadyCharged });
 			}
 
 			default:
@@ -339,3 +422,5 @@ export default async function handler(req, res) {
 		return res.status(500).json({ error: e?.message || "Error de escritura" });
 	}
 }
+
+export { deductInventoryForOrder, syncCanalStock };
