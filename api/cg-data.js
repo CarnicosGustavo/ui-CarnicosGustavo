@@ -376,7 +376,11 @@ export default async function handler(req, res) {
 			// palette: productos reales agrupados por categoría (fuente de arrastre).
 			const palette = {};
 			for (const p of products) { const cat = p.category || "Otros"; (palette[cat] = palette[cat] || []).push(p.name); }
-			if (styles.length) out.recetas = { styles, ...(Object.keys(palette).length ? { palette } : {}) };
+			// productIds: nombre→id, para que el editor pueda resolver el child al
+			// agregar/quitar piezas (recipe.upsert/setActive) sin cambiar la UI.
+			const productIds = {};
+			for (const p of products) productIds[p.name] = p.id;
+			if (styles.length) out.recetas = { styles, productIds, ...(Object.keys(palette).length ? { palette } : {}) };
 		}
 	} catch (e) { console.error("recetas", e?.message); }
 

@@ -63,8 +63,13 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - 🔧 **disponibilidad** del catálogo es aproximada (no usa `availabilityMap` con derivable)
 
 ## Recetas / Configurador
-- ✅ funcional con semilla mock (la pantalla más rica)
-- ⏳ (opcional, alto esfuerzo) mapear a DB + `inventory.recipes*`
+- ✅ **lectura real**: `out.recetas` desde `product_transformations` (styles/rows/kids/pct/variant),
+  agrupado por canal raíz; `palette` = productos reales por categoría; embebe `pid`/`tid`
+- ✅ **persiste edición** de filas existentes: `%`→`recipe.quickUpdate(yieldWeightRatio)`,
+  `pz`→`yieldQuantityPieces`, variante→`isVariant`; peso del canal→`recipe.setRefWeight`
+- ✅ **agregar/quitar pieza**: `recipe.upsert` (crea el vínculo, captura `tid`) · borrar→`recipe.setActive(false)`
+- 🔧 fila recién agregada arranca en 0%; su `%` persiste tras capturar el `tid` del upsert
+- 💡 edición de sub-piezas de 3er nivel: render ok, edición limitada (pre-existente)
 
 ## Productos
 - ✅ buscar · ✅ **agregar/editar/borrar** persisten → `product.*` · importar (file picker)

@@ -45,6 +45,19 @@ function RecetasScreen({ ai }) {
   };
   const mutate = (fn) => { setStyles(prev => { const next = structuredCloneSafe(prev); fn(next); return next; }); touch(); };
 
+  // --- Persistencia por receta (Fase 1b) ---
+  // Si no hay backend (mock) o no hay ids reales (tid/pid), queda solo local — la UI no cambia.
+  const W = (op, params) => { try { return (window.CG && window.CG.write) ? window.CG.write(op, params) : Promise.resolve(null); } catch (e) { return Promise.resolve(null); } };
+  const idOf = (name) => ((window.CG && window.CG.recetas && window.CG.recetas.productIds) || {})[name];
+  // Localiza una fila por id local en el estado actual (devuelve la fila con su tid/pid reales)
+  const locate = (sid, rid) => {
+    const s = styles.find(x => x.id === sid); if (!s) return {};
+    for (const r of s.rows) { if (r.id === rid) return { style: s, row: r };
+      const k = (r.kids || []).find(x => x.id === rid); if (k) return { style: s, row: k, parent: r }; }
+    const deep = (rows) => { for (const r of rows) { if (r.id === rid) return r; if (r.kids) { const f = deep(r.kids); if (f) return f; } } return null; };
+    const row = deep(s.rows); return row ? { style: s, row } : { style: s };
+  };
+
   // Helpers de edición
   const findRow = (root, sid, rid) => {
     const s = root.find(x=>x.id===sid); if(!s) return null;
@@ -53,36 +66,55 @@ function RecetasScreen({ ai }) {
     return null;
   };
 
-  const setPct = (sid, rid, pct, isKid, parentId) => mutate(root=>{
-    const s = root.find(x=>x.id===sid);
-    const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
-    const row = arr.find(r=>r.id===rid); if(row) row.pct = pct;
-  });
-  const setPieces = (sid, rid, pz, isKid, parentId) => mutate(root=>{
-    const s = root.find(x=>x.id===sid);
-    const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
-    const row = arr.find(r=>r.id===rid); if(row) row.pz = Math.max(0, pz);
-  });
-  const toggleVariant = (sid, rid, isKid, parentId) => mutate(root=>{
-    const s = root.find(x=>x.id===sid);
-    const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
-    const row = arr.find(r=>r.id===rid); if(row) row.variant = !row.variant;
-  });
-  const setRefW = (sid, kg) => mutate(root=>{ const s=root.find(x=>x.id===sid); if(s) s.canalW = kg; });
-  const addRow = (sid, name, cat) => mutate(root=>{
-    const s = root.find(x=>x.id===sid); if(!s) return;
-    if (s.rows.some(r=>r.n===name)) return;
-    s.rows.push({ id:uid(), n:name, cat:cat||"Otros", pz:1, pct:0, kids:[] });
-  });
+  const setPct = (sid, rid, pct, isKid, parentId) => {
+    mutate(root=>{
+      const s = root.find(x=>x.id===sid);
+      const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
+      const row = arr.find(r=>r.id===rid); if(row) row.pct = pct;
+    });
+    const { row } = locate(sid, rid); if (row && row.tid != null) W("recipe.quickUpdate", { id: row.tid, yieldWeightRatio: (+pct || 0) / 100 });
+  };
+  const setPieces = (sid, rid, pz, isKid, parentId) => {
+    mutate(root=>{
+      const s = root.find(x=>x.id===sid);
+      const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
+      const row = arr.find(r=>r.id===rid); if(row) row.pz = Math.max(0, pz);
+    });
+    const { row } = locate(sid, rid); if (row && row.tid != null) W("recipe.quickUpdate", { id: row.tid, yieldQuantityPieces: Math.max(0, pz) });
+  };
+  const toggleVariant = (sid, rid, isKid, parentId) => {
+    const { row } = locate(sid, rid); // valor ANTES de mutar
+    mutate(root=>{
+      const s = root.find(x=>x.id===sid);
+      const arr = isKid ? s.rows.find(r=>r.id===parentId).kids : s.rows;
+      const r = arr.find(r=>r.id===rid); if(r) r.variant = !r.variant;
+    });
+    if (row && row.tid != null) W("recipe.quickUpdate", { id: row.tid, isVariant: !row.variant });
+  };
+  const setRefW = (sid, kg) => {
+    mutate(root=>{ const s=root.find(x=>x.id===sid); if(s) s.canalW = kg; });
+    const s = styles.find(x=>x.id===sid); if (s && s.pid != null) W("recipe.setRefWeight", { productId: s.pid, kg: +kg || 0 });
+  };
   // Buscar una fila a cualquier profundidad
   const findDeep = (rows, rid) => { for(const r of rows){ if(r.id===rid) return r; if(r.kids){ const f=findDeep(r.kids,rid); if(f) return f; } } return null; };
-  const addKid = (sid, parentId, name, cat) => mutate(root=>{
-    const s = root.find(x=>x.id===sid); if(!s) return;
-    const p = findDeep(s.rows, parentId); if(!p) return;
-    p.kids = p.kids||[];
-    if (p.kids.some(k=>k.n===name)) return;
-    p.kids.push({ id:uid(), n:name, cat:cat||"Otros", pz:1, pct:0 });
-  });
+  const addRow = (sid, name, cat) => {
+    const s = styles.find(x=>x.id===sid);
+    if (!s || s.rows.some(r=>r.n===name)) return;
+    const newId = uid();
+    mutate(root=>{ const ss=root.find(x=>x.id===sid); if(ss && !ss.rows.some(r=>r.n===name)) ss.rows.push({ id:newId, n:name, cat:cat||"Otros", pz:1, pct:0, kids:[] }); });
+    const cid = idOf(name);
+    if (s.pid != null && cid != null) W("recipe.upsert", { parentProductId:s.pid, childProductId:cid, transformationType:s.type, yieldQuantityPieces:1, yieldWeightRatio:0 })
+      .then(r=>{ if(r && r.ok && r.id != null) setStyles(prev=>{ const next=structuredCloneSafe(prev); const ss=next.find(x=>x.id===sid); const rr=ss&&findDeep(ss.rows,newId); if(rr){ rr.tid=r.id; rr.pid=cid; } return next; }); });
+  };
+  const addKid = (sid, parentId, name, cat) => {
+    const s = styles.find(x=>x.id===sid); if(!s) return;
+    const p = findDeep(s.rows, parentId); if(!p || (p.kids||[]).some(k=>k.n===name)) return;
+    const newId = uid();
+    mutate(root=>{ const ss=root.find(x=>x.id===sid); if(!ss) return; const pp=findDeep(ss.rows,parentId); if(!pp) return; pp.kids=pp.kids||[]; if(!pp.kids.some(k=>k.n===name)) pp.kids.push({ id:newId, n:name, cat:cat||"Otros", pz:1, pct:0 }); });
+    const cid = idOf(name);
+    if (p.pid != null && cid != null) W("recipe.upsert", { parentProductId:p.pid, childProductId:cid, transformationType:"BASE", yieldQuantityPieces:1, yieldWeightRatio:0 })
+      .then(r=>{ if(r && r.ok && r.id != null) setStyles(prev=>{ const next=structuredCloneSafe(prev); const ss=next.find(x=>x.id===sid); const kk=ss&&findDeep(ss.rows,newId); if(kk){ kk.tid=r.id; kk.pid=cid; } return next; }); });
+  };
 
   // Convertir cualquier pieza (hijo o suelta) en PADRE: le habilita su propio despiece
   const convertToParent = (sid, rid) => {
@@ -91,8 +123,12 @@ function RecetasScreen({ ai }) {
   };
   // Borrar un producto de todas las recetas
   const removeProduct = (name) => {
+    // recoge los tids reales de todas las apariciones (a cualquier profundidad) para desactivarlas
+    const tids = []; const walk = (rows) => rows.forEach(r=>{ if(r.n===name && r.tid!=null) tids.push(r.tid); if(r.kids) walk(r.kids); });
+    styles.forEach(s=>walk(s.rows));
     mutate(root=>{ root.forEach(s=>{ s.rows = s.rows.filter(r=>r.n!==name);
       s.rows.forEach(r=>{ if(r.kids) r.kids = r.kids.filter(k=>k.n!==name); }); }); });
+    tids.forEach(id=>W("recipe.setActive", { id, isActive:false }));
     setMeta(m=>({ ...m, [name]:{ ...(m[name]||{}), deleted:true } })); setSelProd(null);
   };
   // Marcar producto como de proveedor (no depende del despiece de un canal)
