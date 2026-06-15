@@ -252,7 +252,7 @@ export default async function handler(req, res) {
 				...(t.products?.is_parent_product ? { hijo: true } : {}),
 			}));
 		}
-		if (canales.length) out.data.despiece = { canales: canales.map(({ pid, ...c }) => c), piezas };
+		if (canales.length) out.data.despiece = { canales, piezas };
 	} catch (e) { console.error("data.despiece", e?.message); }
 
 	// ---------- data.bascula / data.cobro ----------
