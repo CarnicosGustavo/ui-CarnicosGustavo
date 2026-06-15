@@ -17,7 +17,7 @@ const FILES = [
 	"cg-config-antonella",
 	"cg-cedis",
 	"cg-validacion-saldos", "cg-recetas", "cg-config",
-	"cg-designsystem", "cg-app",
+	"cg-designsystem", "cg-pin", "cg-app",
 ];
 
 const dom = new JSDOM(

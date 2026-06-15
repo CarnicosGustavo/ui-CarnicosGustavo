@@ -112,9 +112,14 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   (borra clientes/pedidos/cobranza/precios + transacciones); requiere `confirm:"RESET"`
   y, si `ADMIN_RESET_PASSWORD` está en env, contraseña válida
 
-## Perfil
-- ✅ tema (claro/oscuro), cerrar sesión (local), prompts email/pass
-- ⏳ auth real (Better-Auth) pendiente
+## Perfil / Seguridad
+- ✅ tema (claro/oscuro), prompts email/pass
+- ✅ **login persistente**: el desbloqueo se recuerda entre sesiones (localStorage `cg_session`);
+  botón de **candado** en el header re-bloquea (privacidad) y pide el PIN
+- ✅ **PINs configurables** en *Configuración › Seguridad y PINs* (privacidad / CEDIS / Frío),
+  vía `CG.getPin/setPin/checkPin` + compuerta `CG.requirePin(kind, onOk)` (módulo `cg-pin.jsx`)
+- ✅ **montos del Panel ocultos por defecto**; "Mostrar montos" pide el PIN de privacidad
+- ⏳ auth con credenciales reales (backend) pendiente: hoy el PIN de privacidad es la puerta
 
 ---
 

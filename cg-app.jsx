@@ -175,6 +175,11 @@ function TopBar({ current, theme }) {
       </div>
       <div style={{ justifySelf:"end", display:"flex", alignItems:"center", gap:10 }}>
         <ThemeControl palette={theme.palette} mode={theme.mode} setTheme={theme.set} />
+        <button title="Bloquear (privacidad)" onClick={()=>window.__cgLock&&window.__cgLock()}
+          style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
+          display:"grid", placeItems:"center", cursor:"pointer" }}>
+          <Icon name="lock" size={18} color={Ca.inkSoft} />
+        </button>
         <button title="Mi perfil" onClick={()=>window.__cgGo&&window.__cgGo("perfil")}
           style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
           display:"grid", placeItems:"center", cursor:"pointer" }}>
@@ -196,7 +201,7 @@ function LockScreen({ onUnlock }) {
     setPin(next);
     if (next.length === 4) {
       setTimeout(() => {
-        if (next === "0000") onUnlock();
+        if (window.CG.checkPin ? window.CG.checkPin("privacy", next) : next === "0000") onUnlock();
         else { setErr(true); setPin(""); }
       }, 120);
     }
@@ -240,13 +245,14 @@ function LockScreen({ onUnlock }) {
           </button>
         )}
       </div>
-      <div style={{ font:`500 11px/1 ${Fa.ui}`, color:"rgba(241,231,214,0.4)", flexShrink:0 }}>PIN de demostración: 0000</div>
+      <div style={{ font:`500 11px/1 ${Fa.ui}`, color:"rgba(241,231,214,0.4)", flexShrink:0 }}>PIN inicial: 0000 · cámbialo en Configuración › Seguridad</div>
     </div>
   );
 }
 
 function App() {
-  const [locked, setLocked] = useState(() => sessionStorage.getItem("cg_unlocked") !== "1");
+  // Login persistente: una vez desbloqueado, queda recordado entre sesiones (localStorage).
+  const [locked, setLocked] = useState(() => { try { return localStorage.getItem("cg_session") !== "1"; } catch (e) { return true; } });
   const [current, setCurrent] = useState("panel");
   const [chatOpen, setChatOpen] = useState(false);
   const [seed, setSeed] = useState(null);
@@ -281,7 +287,9 @@ function App() {
     open: ()=> setChatOpen(true),
   };
   const go = (id)=>{ setCurrent(id); const main=document.querySelector(".cg-main"); if(main) main.scrollTop=0; };
-  useEffect(()=>{ window.__cgGo = go; window.__cgSetTheme = setTheme; }, []);
+  // Botón de privacidad / cerrar sesión → re-bloquea y olvida la sesión (pide PIN de nuevo).
+  const lock = ()=>{ try { localStorage.removeItem("cg_session"); } catch(e){} setLocked(true); };
+  useEffect(()=>{ window.__cgGo = go; window.__cgSetTheme = setTheme; window.__cgLock = lock; }, []);
 
   const screens = {
     panel:    <PanelScreen ai={ai} />,
@@ -304,6 +312,7 @@ function App() {
     caja:     <CajaScreen ai={ai} />,
     config:   <ConfigScreen ai={ai} go={go} />,
     settings: <ConfigScreen ai={ai} go={go} />,
+    seguridad: <SeguridadScreen ai={ai} />,
     perfil:   <ProfileScreen ai={ai} />,
   };
   const content = screens[current] || <PlaceholderScreen id={current} ai={ai} />;
@@ -311,7 +320,8 @@ function App() {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100vh", background:Ca.bg }}>
-      {locked && <LockScreen onUnlock={()=>{ sessionStorage.setItem("cg_unlocked","1"); setLocked(false); }} />}
+      {locked && <LockScreen onUnlock={()=>{ try { localStorage.setItem("cg_session","1"); } catch(e){} setLocked(false); }} />}
+      <PinGate />
       <div style={{ filter: locked ? "blur(14px)" : "none", transition:"filter .4s ease",
         display:"flex", flexDirection:"column", height:"100%", pointerEvents: locked?"none":"auto" }}>
         <TopBar current={current} theme={theme} />

@@ -96,6 +96,7 @@ CG.configItems = [
   { id:"payment",   label:"Métodos de pago",icon:"credit-card" },
   { id:"validacion", label:"Validación de saldos", icon:"shield-check" },
   { id:"configAntonella", label:"Antonella", icon:"sparkles" },
+  { id:"seguridad", label:"Seguridad y PINs", icon:"shield" },
   { id:"designsystem", label:"Sistema de Diseño", icon:"shapes" },
   { id:"settings",  label:"Configuración",  icon:"settings" },
 ];

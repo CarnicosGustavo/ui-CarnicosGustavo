@@ -43,6 +43,7 @@ function ConfigScreen({ ai, go }) {
 const CONFIG_DESC = {
   productos:"Catálogo, tipos y stock", recetas:"Despiece y rendimiento", precios:"Listas por cliente",
   cold:"Fresco vs. frío", caja:"Ingresos y egresos", payment:"Formas de cobro",
+  seguridad:"PINs de privacidad, CEDIS y Frío",
 };
 function DangerCard({ tone, icon, title, desc, cta, op }) {
   const fg = tone==="red"?Cc.red:Cc.amber, bg = tone==="red"?Cc.redWash:Cc.amberWash;

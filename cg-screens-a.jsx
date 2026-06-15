@@ -18,7 +18,7 @@ function Slot({ id, ai }) {
 /* ---------------- PANEL ---------------- */
 function PanelScreen({ ai }) {
   const p = D.panel;
-  const [hide, setHide] = useState(false);
+  const [hide, setHide] = useState(true); // montos ocultos por defecto; se revelan con el PIN de privacidad
   const m = (v)=> hide ? "•  •  •" : moneyk(v);
   const totalCat = p.ingresosCat.reduce((s,x)=>s+x.v,0);
   // donut conic
@@ -42,7 +42,8 @@ function PanelScreen({ ai }) {
             <span style={{ color:"#9A9087" }}>  ·  {D.panel ? "Jueves 12 de junio, 2026" : ""}</span>
           </p>
         </div>
-        <Btn kind="outline" icon={hide?"eye":"eye-off"} onClick={()=>setHide(h=>!h)}
+        <Btn kind="outline" icon={hide?"eye":"eye-off"}
+          onClick={()=> hide ? (window.CG.requirePin ? window.CG.requirePin("privacy", ()=>setHide(false), { msg:"Ingresa el PIN para ver los montos" }) : setHide(false)) : setHide(true)}
           style={{ background:"#FBF7EF", color:"#211C19", border:"1px solid rgba(33,28,25,0.14)" }}>
           {hide?"Mostrar montos":"Ocultar montos"}
         </Btn>

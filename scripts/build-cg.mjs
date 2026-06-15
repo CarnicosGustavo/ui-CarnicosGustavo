@@ -30,6 +30,7 @@ const FILES = [
 	"cg-recetas",
 	"cg-config",
 	"cg-designsystem",
+	"cg-pin",
 	"cg-app",
 ];
 
