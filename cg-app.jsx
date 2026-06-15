@@ -175,6 +175,7 @@ function TopBar({ current, theme }) {
       </div>
       <div style={{ justifySelf:"end", display:"flex", alignItems:"center", gap:10 }}>
         <ThemeControl palette={theme.palette} mode={theme.mode} setTheme={theme.set} />
+        <NotifBell />
         <button title="Bloquear (privacidad)" onClick={()=>window.__cgLock&&window.__cgLock()}
           style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
           display:"grid", placeItems:"center", cursor:"pointer" }}>
@@ -289,7 +290,7 @@ function App() {
   const go = (id)=>{ setCurrent(id); const main=document.querySelector(".cg-main"); if(main) main.scrollTop=0; };
   // Botón de privacidad / cerrar sesión → re-bloquea y olvida la sesión (pide PIN de nuevo).
   const lock = ()=>{ try { localStorage.removeItem("cg_session"); } catch(e){} setLocked(true); };
-  useEffect(()=>{ window.__cgGo = go; window.__cgSetTheme = setTheme; window.__cgLock = lock; }, []);
+  useEffect(()=>{ window.__cgGo = go; window.__cgSetTheme = setTheme; window.__cgLock = lock; window.__cgAsk = (t)=>ai.chip(t); }, []);
 
   const screens = {
     panel:    <PanelScreen ai={ai} />,
