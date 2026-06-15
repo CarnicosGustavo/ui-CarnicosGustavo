@@ -132,14 +132,14 @@ export default async function handler(req, res) {
 				return ok({ id: data.id });
 			}
 			case "payment.update": {
-				if (!p.id || !p.name) return fail("id y name requeridos");
-				const { error } = await db.from("payment_methods").update({ name: p.name }).eq("id", p.id);
+				if (!p.name || !p.newName) return fail("name y newName requeridos");
+				const { error } = await db.from("payment_methods").update({ name: p.newName }).eq("name", p.name);
 				if (error) throw error;
 				return ok({});
 			}
 			case "payment.delete": {
-				if (!p.id) return fail("id requerido");
-				const { error } = await db.from("payment_methods").delete().eq("id", p.id);
+				if (!p.name) return fail("name requerido");
+				const { error } = await db.from("payment_methods").delete().eq("name", p.name);
 				if (error) throw error;
 				return ok({});
 			}

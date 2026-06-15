@@ -79,6 +79,7 @@ export default async function handler(req, res) {
 			.filter((p) => num(p.stock_kg) || num(p.stock_pieces) || num(p.stock_kg_frozen) || num(p.stock_pieces_frozen))
 			.slice(0, 30)
 			.map((p) => ({
+				id: p.id,
 				n: p.name,
 				fresco: [num(p.stock_kg), num(p.stock_pieces)],
 				frio: [num(p.stock_kg_frozen), num(p.stock_pieces_frozen)],

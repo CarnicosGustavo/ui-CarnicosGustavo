@@ -215,12 +215,21 @@ function priceInput(active) {
 /* ---------- INVENTARIO FRÍO ---------- */
 function ColdScreen({ ai }) {
   const [rows, setRows] = useState(CFG.cold);
-  const transfer = (idx, dir)=> setRows(rs=>rs.map((r,i)=>{
-    if (i!==idx) return r;
-    return dir==="frio"
-      ? { ...r, frio:[r.frio[0]+r.fresco[0], r.frio[1]+r.fresco[1]], fresco:[0,0] }
-      : { ...r, fresco:[r.fresco[0]+r.frio[0], r.fresco[1]+r.frio[1]], frio:[0,0] };
-  }));
+  const transfer = (idx, dir)=>{
+    const r = rows[idx];
+    if (r && r.id && window.CG.write) {
+      const kg = dir==="frio" ? r.fresco[0] : r.frio[0];
+      const pieces = dir==="frio" ? r.fresco[1] : r.frio[1];
+      window.CG.write(dir==="frio" ? "cold.toFrozen" : "cold.toFresh", { productId:r.id, kg, pieces })
+        .then(function(x){ if(x&&x.ok&&window.CG.refresh) window.CG.refresh(); });
+    }
+    setRows(rs=>rs.map((row,i)=>{
+      if (i!==idx) return row;
+      return dir==="frio"
+        ? { ...row, frio:[row.frio[0]+row.fresco[0], row.frio[1]+row.fresco[1]], fresco:[0,0] }
+        : { ...row, fresco:[row.fresco[0]+row.frio[0], row.fresco[1]+row.frio[1]], frio:[0,0] };
+    }));
+  };
   return (
     <div>
       <ScreenHead title="Inventario Frío" desc="Solo el inventario fresco se vende. Lo que no se vende se envía a frío; para vender de frío, primero descongélalo a fresco." />
@@ -324,9 +333,10 @@ function CajaScreen({ ai }) {
 /* ---------- MÉTODOS DE PAGO ---------- */
 function PaymentScreen({ ai }) {
   const [pays, setPays] = useState(CFG.payment);
-  const addPay = ()=>{ const n=window.prompt("Nombre del método de pago"); if(n && n.trim()) setPays(a=>[...a, n.trim()]); };
-  const editPay = (idx)=>{ const n=window.prompt("Nombre del método", pays[idx]); if(n && n.trim()) setPays(a=>a.map((x,i)=>i===idx?n.trim():x)); };
-  const delPay = (idx)=> setPays(a=>a.filter((_,i)=>i!==idx));
+  const W = (op,params)=> window.CG.write && window.CG.write(op,params).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+  const addPay = ()=>{ const n=window.prompt("Nombre del método de pago"); if(n && n.trim()){ setPays(a=>[...a, n.trim()]); W("payment.create",{name:n.trim()}); } };
+  const editPay = (idx)=>{ const old=pays[idx]; const n=window.prompt("Nombre del método", old); if(n && n.trim()){ setPays(a=>a.map((x,i)=>i===idx?n.trim():x)); W("payment.update",{name:old, newName:n.trim()}); } };
+  const delPay = (idx)=>{ const name=pays[idx]; setPays(a=>a.filter((_,i)=>i!==idx)); W("payment.delete",{name}); };
   return (
     <div>
       <ScreenHead title="Métodos de pago" desc="Formas de cobro disponibles al cerrar un pedido."
