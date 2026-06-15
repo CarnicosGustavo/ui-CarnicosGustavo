@@ -185,6 +185,24 @@ export default async function handler(req, res) {
 				return ok({ saved });
 			}
 
+			// ---------- PEDIDOS: actualizar estado / eliminar ----------
+			case "order.update": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.status !== undefined) patch.status = p.status; // p.ej. "cancelled"
+				if (p.total_amount !== undefined) patch.total_amount = Math.round(Number(p.total_amount));
+				const { error } = await db.from("orders").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "order.delete": {
+				if (!p.id) return fail("id requerido");
+				await db.from("order_items").delete().eq("order_id", p.id);
+				const { error } = await db.from("orders").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+
 			// ---------- PEDIDOS: crear (POS / Nuevo pedido) ----------
 			// Inserta order + order_items. NO descuenta inventario (eso ocurre al
 			// cobrar). Estado: PENDIENTE_PESAJE si hay piezas por pesar, si no

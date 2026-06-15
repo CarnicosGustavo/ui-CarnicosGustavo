@@ -300,7 +300,9 @@ function SmallAct({ icon, label, color, bg, onClick }) {
 
 /* ---------- CAJA ---------- */
 function CajaScreen({ ai }) {
-  const [txs, setTxs] = useState([]);
+  const [txs, setTxs] = useState(()=> ((window.CG.config && window.CG.config.caja) || []).slice());
+  const delTx = (i, t)=>{ setTxs(a=>a.filter((_,j)=>j!==i));
+    if (t.id && window.CG.write) window.CG.write("tx.delete",{ id:t.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); };
   const [desc, setDesc] = useState("");
   const [cat, setCat] = useState("");
   const [tipo, setTipo] = useState("Ingreso");
@@ -323,8 +325,8 @@ function CajaScreen({ ai }) {
         <h3 style={{ margin:"0 0 4px", font:`700 16px/1 ${Fc.ui}`, color:Cc.ink }}>Transacciones de caja</h3>
         <p style={{ margin:"0 0 18px", font:`400 13px/1 ${Fc.ui}`, color:Cc.inkSoft }}>Administra tus transacciones de caja.</p>
         <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:14 }}>
-          <thead><tr>{["Descripción","Categoría","Tipo","Fecha","Importe"].map((h,i)=>(
-            <th key={i} style={{ textAlign:i>=3?"right":"left", font:`700 11px/1 ${Fc.ui}`, letterSpacing:"0.05em",
+          <thead><tr>{["Descripción","Categoría","Tipo","Fecha","Importe",""].map((h,i)=>(
+            <th key={i} style={{ textAlign:i>=3&&i<5?"right":i===5?"center":"left", font:`700 11px/1 ${Fc.ui}`, letterSpacing:"0.05em",
               textTransform:"uppercase", color:Cc.inkFaint, padding:"0 8px 12px" }}>{h}</th>))}</tr></thead>
           <tbody>
             {txs.map((t,i)=>(
@@ -335,6 +337,8 @@ function CajaScreen({ ai }) {
                 <td style={{ padding:"11px 8px", textAlign:"right", font:`500 12.5px/1 ${Fc.mono}`, color:Cc.inkSoft }}>{t.fecha}</td>
                 <td style={{ padding:"11px 8px", textAlign:"right", font:`700 13px/1 ${Fc.mono}`, color: t.tipo==="Ingreso"?Cc.green:Cc.red }}>
                   {t.tipo==="Egreso"?"–":""}{m$(t.importe)}</td>
+                <td style={{ padding:"11px 8px", textAlign:"center" }}>
+                  <IconBtn icon="trash-2" color={Cc.red} onClick={()=>delTx(i,t)} /></td>
               </tr>
             ))}
           </tbody>

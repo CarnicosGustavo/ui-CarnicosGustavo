@@ -94,6 +94,17 @@ export default async function handler(req, res) {
 		if (data?.length) out.config.payment = data.map((m) => m.name);
 	} catch (e) { console.error("config.payment", e?.message); }
 
+	// ---------- config.caja (transactions) ----------
+	try {
+		const { data } = await scoped(db.from("transactions").select("id, description, category, type, amount, created_at"))
+			.order("id", { ascending: false }).limit(50);
+		if (data?.length) out.config.caja = data.map((t) => ({
+			id: t.id, desc: t.description || "—", cat: t.category || "General",
+			tipo: t.type === "expense" ? "Egreso" : "Ingreso",
+			fecha: fechaCorta(t.created_at), importe: c2p(t.amount),
+		}));
+	} catch (e) { console.error("config.caja", e?.message); }
+
 	// ---------- ops.pos ----------
 	try {
 		const { data: lists } = await scoped(db.from("price_lists").select("name")).order("name");
