@@ -519,28 +519,8 @@ export default async function handler(req, res) {
 
 			// ---------- PEDIDOS: editar cabecera (estado/total/cliente/notas) ----------
 			// total_amount entra en PESOS y se guarda en CENTAVOS (convención ui-CG).
-			case "order.update": {
-				if (!p.id) return fail("id requerido");
-				const patch = {};
-				if (p.status !== undefined) patch.status = p.status;
-				if (p.total_amount !== undefined) patch.total_amount = Math.round(Number(p.total_amount) * 100);
-				if (p.customerId !== undefined) patch.customer_id = p.customerId;
-				if (p.notes !== undefined) patch.notes = p.notes;
-				if (!Object.keys(patch).length) return fail("nada que actualizar");
-				const { error } = await db.from("orders").update(patch).eq("id", p.id);
-				if (error) throw error;
-				return ok({ id: p.id });
-			}
 
 			// ---------- PEDIDOS: eliminar (items + cabecera) ----------
-			case "order.delete": {
-				if (!p.id) return fail("id requerido");
-				const { error: e1 } = await db.from("order_items").delete().eq("order_id", p.id);
-				if (e1) throw e1;
-				const { error } = await db.from("orders").delete().eq("id", p.id);
-				if (error) throw error;
-				return ok({ id: p.id });
-			}
 
 			// ---------- PEDIDOS: reemplazar renglones (edición completa) ----------
 			// Réplica de orders.replaceItems de M1: borra los renglones, recrea desde
