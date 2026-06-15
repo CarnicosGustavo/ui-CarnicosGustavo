@@ -109,7 +109,20 @@ function ProfileScreen({ ai }) {
   };
   const cambiarEmail = ()=> window.prompt("Nuevo correo electrónico", user.email);
   const nuevaPass = ()=> window.prompt("Escribe la nueva contraseña");
-  const cerrarSesion = ()=>{ sessionStorage.removeItem("cg_unlocked"); window.location.reload(); };
+  // Sesión Supabase OPCIONAL: la entrada al sistema sigue siendo el PIN; esto solo
+  // atribuye las escrituras (user_uid) a un usuario real cuando inicias sesión aquí.
+  const [sesion, setSesion] = useState(window.CG.session || null);
+  useEffect(()=>{ if(window.CG.verifySession && typeof fetch!=="undefined") window.CG.verifySession().then(()=> setSesion(window.CG.session||null)); }, []);
+  const loginSupabase = ()=>{
+    const email = window.prompt("Correo (Supabase)", (window.CG.session&&window.CG.session.user&&window.CG.session.user.email)||""); if(!email) return;
+    const pw = window.prompt("Contraseña"); if(!pw) return;
+    if(window.CG.login) window.CG.login(email, pw).then(function(r){
+      if(r&&r.ok){ setSesion(window.CG.session||null); window.alert("Sesión iniciada: las escrituras se atribuirán a tu usuario."); if(window.CG.refresh) window.CG.refresh(); }
+      else window.alert("No se pudo iniciar sesión: "+((r&&r.error)||"error"));
+    });
+  };
+  const cerrarSesion = ()=>{ if(window.CG.logout) window.CG.logout(); setSesion(null);
+    if(window.__cgLock) window.__cgLock(); else { try{ localStorage.removeItem("cg_session"); }catch(e){} window.location.reload(); } };
   const eliminarCuenta = ()=>{ if (window.confirm("¿Eliminar tu cuenta? Esta acción no se puede deshacer.")) cerrarSesion(); };
 
   return (
@@ -190,6 +203,22 @@ function ProfileScreen({ ai }) {
                 Activo
               </div>
             </div>
+          </div>
+        </Card>
+
+        {/* Sesión Supabase (opcional, para atribuir escrituras) */}
+        <Card style={{ marginBottom:16 }}>
+          <Label>Sesión de trabajo (Supabase)</Label>
+          <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div style={{ flex:1, minWidth:180 }}>
+              <div style={{ font:`500 13px/1.4 ${Ff.ui}`, color:Cf.ink }}>
+                {sesion && sesion.user ? ("Conectado: " + (sesion.user.email || sesion.user.id)) : "Sin sesión — las escrituras usan el usuario del sistema."}
+              </div>
+              <div style={{ font:`500 11px/1.4 ${Ff.ui}`, color:Cf.inkFaint, marginTop:3 }}>La entrada al sistema sigue siendo por PIN; esto solo atribuye quién hace cada cambio.</div>
+            </div>
+            {sesion
+              ? <Btn kind="outline" size="sm" icon="log-out" onClick={()=>{ if(window.CG.logout) window.CG.logout(); setSesion(null); }}>Cerrar sesión Supabase</Btn>
+              : <Btn kind="dark" size="sm" icon="log-in" onClick={loginSupabase}>Iniciar sesión</Btn>}
           </div>
         </Card>
 

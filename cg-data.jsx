@@ -579,11 +579,13 @@ CG.ask = function (question, module) {
 };
 
 // Escritura: POST /api/write { op, ...params }. Devuelve {ok,...} o {error}.
+// Si hay sesión Supabase (CG.uid), se adjunta userUid para atribuir la escritura.
 CG.write = function (op, params) {
+  var extra = (CG.uid && CG.uid()) ? { userUid: CG.uid() } : {};
   return fetch("/api/write", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(Object.assign({ op: op }, params || {})),
+    body: JSON.stringify(Object.assign({ op: op }, extra, params || {})),
   })
     .then(function (r) { return r.json(); })
     .catch(function () { return { error: "sin conexión" }; });

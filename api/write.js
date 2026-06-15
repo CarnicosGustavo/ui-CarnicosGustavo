@@ -223,11 +223,14 @@ export default async function handler(req, res) {
 	}
 	const { op, ...p } = body || {};
 	if (!op) return res.status(400).json({ error: "Falta 'op'" });
+	// Dueño de los inserts/scoping: si el cliente manda userUid (sesión Supabase), se usa
+	// ese; si no, el fijo de entorno (CG_USER_UID). La entrada sigue siendo por PIN.
+	const ownerUid = (p.userUid && String(p.userUid)) || USER_UID;
 
 	const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 	const ok = (data) => res.status(200).json({ ok: true, ...data });
 	const fail = (msg, code = 400) => res.status(code).json({ error: msg });
-	const scopedW = (q) => (USER_UID ? q.eq("user_uid", USER_UID) : q.gte("id", 0));
+	const scopedW = (q) => (ownerUid ? q.eq("user_uid", ownerUid) : q.gte("id", 0));
 
 	try {
 		switch (op) {
@@ -337,7 +340,7 @@ export default async function handler(req, res) {
 					name: p.name, email, contact_name: p.contact_name || null,
 					phone: p.phone || null, whatsapp_phone: p.whatsapp_phone || null,
 					address: p.address || null, notes: p.notes || null,
-					status: p.status || "active", user_uid: USER_UID,
+					status: p.status || "active", user_uid: ownerUid,
 					price_list_id: p.price_list_id ?? null,
 				}).select("id").single();
 				if (error) throw error;
@@ -371,7 +374,7 @@ export default async function handler(req, res) {
 				const { data, error } = await db.from("transactions").insert({
 					description: p.description, amount: Math.round(Number(p.amount)),
 					type: p.type === "expense" ? "expense" : "income",
-					category: p.category || null, status: p.status || "completed", user_uid: USER_UID,
+					category: p.category || null, status: p.status || "completed", user_uid: ownerUid,
 				}).select("id").single();
 				if (error) throw error;
 				return ok({ id: data.id });
@@ -503,7 +506,7 @@ export default async function handler(req, res) {
 					customer_id: p.customerId,
 					status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO",
 					total_amount: total,
-					user_uid: USER_UID,
+					user_uid: ownerUid,
 					requires_weighing: needWeigh,
 				}).select("id").single();
 				if (error) throw error;
@@ -660,7 +663,7 @@ export default async function handler(req, res) {
 					sheet_date: p.sheetDate || today(),
 					num_canales: Math.round(Number(p.numCanales) || 0),
 					kg_comprado: Number(p.kgComprado || 0).toFixed(3),
-					supplier: p.supplier || null, notes: p.notes || null, user_uid: USER_UID,
+					supplier: p.supplier || null, notes: p.notes || null, user_uid: ownerUid,
 				}).select("id").single();
 				if (e1) throw e1;
 				const items = Array.isArray(p.items) ? p.items : [];
@@ -684,7 +687,7 @@ export default async function handler(req, res) {
 			// ---------- CEDIS (verificación de canales recibidos) ----------
 			case "cedis.addSupplier": {
 				const { data, error } = await db.from("channel_purchases").insert({
-					supplier: p.supplier || "Proveedor", purchase_date: p.date || today(), user_uid: USER_UID,
+					supplier: p.supplier || "Proveedor", purchase_date: p.date || today(), user_uid: ownerUid,
 				}).select("id").single();
 				if (error) throw error;
 				return ok({ id: data.id });
@@ -736,7 +739,7 @@ export default async function handler(req, res) {
 			case "purchases.save": {
 				if (!Array.isArray(p.rows)) return fail("rows[] requerido");
 				const d = today();
-				await db.from("channel_purchases").delete().eq("user_uid", USER_UID).eq("purchase_date", d);
+				await db.from("channel_purchases").delete().eq("user_uid", ownerUid).eq("purchase_date", d);
 				for (const r of p.rows) {
 					const { error } = await db.from("channel_purchases").insert({
 						supplier: r.supplier || null,
@@ -745,11 +748,11 @@ export default async function handler(req, res) {
 						num_medias: Math.round(Number(r.canales) || 0),
 						total_kg: Number(r.kgPie || 0).toFixed(3),
 						price_per_kg: r.precioKg != null ? Number(r.precioKg).toFixed(2) : null,
-						purchase_date: d, user_uid: USER_UID,
+						purchase_date: d, user_uid: ownerUid,
 					});
 					if (error) throw error;
 				}
-				await syncCanalStock(db, USER_UID);
+				await syncCanalStock(db, ownerUid);
 				return ok({ saved: p.rows.length });
 			}
 
@@ -757,7 +760,7 @@ export default async function handler(req, res) {
 			case "product.create": {
 				if (!p.name) return fail("name requerido");
 				const { data, error } = await db.from("products").insert({
-					name: p.name, category: p.category || null, user_uid: USER_UID,
+					name: p.name, category: p.category || null, user_uid: ownerUid,
 					is_parent_product: !!p.is_parent_product,
 					price_per_kg: p.price_per_kg != null ? Number(p.price_per_kg).toFixed(2) : null,
 					stock_pieces: p.stock_pieces != null ? Math.round(Number(p.stock_pieces)) : 0,
@@ -837,7 +840,7 @@ export default async function handler(req, res) {
 				} else {
 					await db.from("transactions").insert({
 						description: `Cobro pedido #${p.orderId}`, amount: total, type: "income",
-						category: "Ventas", status: "completed", user_uid: USER_UID, order_id: p.orderId,
+						category: "Ventas", status: "completed", user_uid: ownerUid, order_id: p.orderId,
 					});
 				}
 				return ok({ orderId: p.orderId, total, inventoryDeducted: !alreadyCharged });

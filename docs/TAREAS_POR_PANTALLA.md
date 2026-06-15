@@ -146,7 +146,13 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   producto, eliminar movimiento de caja, recalibrar recetas y **resets** (además de la
   contraseña admin). **Antonella** también lo pide: acciones con `a.auth`/`a.op` piden PIN
   antes de ejecutar la op.
-- ⏳ auth con credenciales reales (backend) pendiente: hoy el PIN de privacidad es la puerta
+- ✅ **Auth Supabase para atribución (no es la puerta)**: la entrada sigue por **PIN**;
+  Supabase Auth (`cg-auth.jsx` + `api/auth.js`) es **opcional** y solo sirve para `user_uid`:
+  `CG.write` adjunta `userUid: CG.uid()` si hay sesión; `api/write.js` usa ese uid (o el
+  `CG_USER_UID` de entorno si no hay). Login/logout opcional en **Perfil**. Requiere
+  `SUPABASE_ANON_KEY` + usuarios en Supabase Auth.
+  ⚠️ El uid de Supabase debe coincidir con el dueño de los datos (`CG_USER_UID`) o el
+  scoping mostrará datos vacíos.
 
 ---
 
