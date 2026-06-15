@@ -216,20 +216,24 @@ function priceInput(active) {
 /* ---------- INVENTARIO FRÍO ---------- */
 function ColdScreen({ ai }) {
   const [rows, setRows] = useState(CFG.cold);
-  const transfer = (idx, dir)=>{
-    const r = rows[idx];
+  const [xfer, setXfer] = useState(null);   // { idx, dir, kg, pieces } o null
+  const abrir = (idx, dir)=>{ const r=rows[idx]; const src = dir==="frio" ? r.fresco : r.frio;
+    setXfer({ idx, dir, kg:String(src[0]||""), pieces:String(src[1]||"") }); };
+  const doTransfer = ()=>{
+    if (!xfer) return;
+    const { idx, dir } = xfer; const r = rows[idx];
+    const kg = parseFloat(xfer.kg)||0, pieces = parseInt(xfer.pieces,10)||0;
     if (r && r.id && window.CG.write) {
-      const kg = dir==="frio" ? r.fresco[0] : r.frio[0];
-      const pieces = dir==="frio" ? r.fresco[1] : r.frio[1];
       window.CG.write(dir==="frio" ? "cold.toFrozen" : "cold.toFresh", { productId:r.id, kg, pieces })
         .then(function(x){ if(x&&x.ok&&window.CG.refresh) window.CG.refresh(); });
     }
     setRows(rs=>rs.map((row,i)=>{
       if (i!==idx) return row;
       return dir==="frio"
-        ? { ...row, frio:[row.frio[0]+row.fresco[0], row.frio[1]+row.fresco[1]], fresco:[0,0] }
-        : { ...row, fresco:[row.fresco[0]+row.frio[0], row.fresco[1]+row.frio[1]], frio:[0,0] };
+        ? { ...row, frio:[row.frio[0]+kg, row.frio[1]+pieces], fresco:[Math.max(0,row.fresco[0]-kg), Math.max(0,row.fresco[1]-pieces)] }
+        : { ...row, fresco:[row.fresco[0]+kg, row.fresco[1]+pieces], frio:[Math.max(0,row.frio[0]-kg), Math.max(0,row.frio[1]-pieces)] };
     }));
+    setXfer(null);
   };
   return (
     <div>
@@ -253,9 +257,9 @@ function ColdScreen({ ai }) {
                   <td style={{ padding:"13px 16px" }}>
                     <div style={{ display:"flex", gap:8, justifyContent:"center", flexWrap:"wrap" }}>
                       <SmallAct icon="snowflake" label="A frío" color={Cc.blue} bg={Cc.blueWash}
-                        onClick={()=>transfer(i,"frio")} />
+                        onClick={()=>abrir(i,"frio")} />
                       <SmallAct icon="flame" label="A fresco" color={Cc.red} bg={Cc.redWash}
-                        onClick={()=>transfer(i,"fresco")} />
+                        onClick={()=>abrir(i,"fresco")} />
                     </div>
                   </td>
                 </tr>
@@ -264,6 +268,27 @@ function ColdScreen({ ai }) {
           </table>
         </div>
       </Card>
+      <Modal open={!!xfer} onClose={()=>setXfer(null)}
+        icon={xfer&&xfer.dir==="frio"?"snowflake":"flame"}
+        title={xfer&&xfer.dir==="frio"?"Enviar a frío":"Descongelar a fresco"} width={400}
+        subtitle="Indica cuánto transferir."
+        footer={<>
+          <Btn kind="outline" onClick={()=>setXfer(null)}>Cancelar</Btn>
+          <Btn kind="green" icon="check" onClick={doTransfer}>Confirmar</Btn>
+        </>}>
+        {xfer && (
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <div>
+              <div style={{ font:`600 12px/1 ${Fc.ui}`, color:Cc.inkSoft, marginBottom:6 }}>Kg</div>
+              <input value={xfer.kg} type="number" inputMode="decimal" onChange={e=>setXfer({ ...xfer, kg:e.target.value })} style={inputCfg} />
+            </div>
+            <div>
+              <div style={{ font:`600 12px/1 ${Fc.ui}`, color:Cc.inkSoft, marginBottom:6 }}>Piezas</div>
+              <input value={xfer.pieces} type="number" onChange={e=>setXfer({ ...xfer, pieces:e.target.value })} style={inputCfg} />
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

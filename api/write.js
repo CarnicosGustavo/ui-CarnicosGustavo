@@ -225,6 +225,28 @@ export default async function handler(req, res) {
 				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
 			}
 
+			// ---------- COMPRA DEL DÍA (channel_purchases) ----------
+			// Reemplaza las compras de HOY del usuario. No re-sincroniza stock de
+			// canales (a validar; la lógica de M1 lo hace).
+			case "purchases.save": {
+				if (!Array.isArray(p.rows)) return fail("rows[] requerido");
+				const d = today();
+				await db.from("channel_purchases").delete().eq("user_uid", USER_UID).eq("purchase_date", d);
+				for (const r of p.rows) {
+					const { error } = await db.from("channel_purchases").insert({
+						supplier: r.supplier || null,
+						qty_americano: Math.round(Number(r.americanos) || 0),
+						qty_nacional: Math.round(Number(r.nacionales) || 0),
+						num_medias: Math.round(Number(r.canales) || 0),
+						total_kg: Number(r.kgPie || 0).toFixed(3),
+						price_per_kg: r.precioKg != null ? Number(r.precioKg).toFixed(2) : null,
+						purchase_date: d, user_uid: USER_UID,
+					});
+					if (error) throw error;
+				}
+				return ok({ saved: p.rows.length });
+			}
+
 			// ---------- PRODUCTOS (catálogo) ----------
 			case "product.create": {
 				if (!p.name) return fail("name requerido");

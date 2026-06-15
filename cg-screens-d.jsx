@@ -144,6 +144,8 @@ function PosScreen({ ai }) {
   const [factura, setFactura] = useState(false);
   const cycle = (arr, cur, set)=>{ const i=arr.indexOf(cur); set(arr[(i+1)%arr.length]); };
   const cycleCli = ()=>{ if(!clientes.length) return; const i=clientes.findIndex(x=>x===cli); setCli(clientes[(i+1)%clientes.length]); };
+  // Precarga de cliente desde "Nuevo pedido" en Clientes
+  useEffect(()=>{ if(window.__cgPosClient){ setCli(window.__cgPosClient); window.__cgPosClient = null; } }, []);
   const crearPedido = ()=>{
     if (!cart.length) return;
     if (cli && cli.id && window.CG.write) {

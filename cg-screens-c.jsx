@@ -227,7 +227,7 @@ function ClientesScreen({ ai }) {
                       {c.tel && <RowAct icon="message-circle" color={Cx.green} title="WhatsApp"
                         onClick={()=>waOpen(c.tel, `Hola ${c.nombre}`)} />}
                       <Kebab items={[
-                        { label:"Nuevo pedido", icon:"plus", onClick:()=>goTo("pos") },
+                        { label:"Nuevo pedido", icon:"plus", onClick:()=>{ window.__cgPosClient = { id:c.id, nombre:c.nombre }; goTo("pos"); } },
                         { label:"Editar cliente", icon:"file-pen", onClick:()=>setEditC(c) },
                         ...(c.tel ? [{ label:"WhatsApp", icon:"message-circle", onClick:()=>waOpen(c.tel, `Hola ${c.nombre}`) }] : []),
                         { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("cobranza") },

@@ -123,7 +123,12 @@ function CompraScreen({ ai }) {
   return (
     <div>
       <ScreenHead title="Compra del día" desc="El día empieza aquí: registra la compra en pie por proveedor. Es la base del rendimiento."
-        right={<Btn kind="dark" icon="save" onClick={()=>window.__cgGo&&window.__cgGo("rendimiento")}>Guardar compra del día</Btn>} />
+        right={<Btn kind="dark" icon="save" onClick={()=>{
+          if (window.CG.write) window.CG.write("purchases.save", {
+            rows: provs.map(pr=>({ supplier:pr.nombre, americanos:pr.americanos, nacionales:pr.nacionales, canales:pr.canales, kgPie:pr.kgPie, precioKg:pr.precioKg })),
+          }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+          window.__cgGo && window.__cgGo("rendimiento");
+        }}>Guardar compra del día</Btn>} />
       <Card pad={16} style={{ marginBottom:14, display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-end" }}>
         <div>
           <Overline style={{ marginBottom:7 }}>Día de operación</Overline>
