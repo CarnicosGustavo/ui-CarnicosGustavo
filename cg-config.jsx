@@ -93,7 +93,18 @@ function ProductosScreen({ ai }) {
   const view = prods.filter(p=> !q || p.n.toLowerCase().includes(q.toLowerCase()));
   const W = (op,params)=> window.CG.write && window.CG.write(op,params).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
   const addProd = ()=>{ const n=window.prompt("Nombre del producto nuevo"); if(!n||!n.trim()) return; setProds(a=>[{ n:n.trim(), tipo:"Hijo", rend:null, precio:0, stock:0 }, ...a]); W("product.create",{name:n.trim()}); };
-  const editProd = (p)=>{ const n=window.prompt("Nombre del producto", p.n); if(n&&n.trim()){ setProds(a=>a.map(x=>x===p?{...x, n:n.trim()}:x)); if(p.id) W("product.update",{id:p.id, name:n.trim()}); } };
+  const editProd = (p)=>{
+    const n = window.prompt("Nombre del producto", p.n); if (n===null) return;
+    const pr = window.prompt("Precio por kg ($)", String(p.precio ?? 0)); if (pr===null) return;
+    const st = window.prompt("Stock (piezas)", String(p.stock ?? 0)); if (st===null) return;
+    const cg = window.prompt("Categoría", p.cat || ""); if (cg===null) return;
+    const nn = n.trim() || p.n;
+    const npr = (!isNaN(parseFloat(pr)) && parseFloat(pr) >= 0) ? parseFloat(pr) : (p.precio ?? 0);
+    const nst = (!isNaN(parseInt(st, 10)) && parseInt(st, 10) >= 0) ? parseInt(st, 10) : (p.stock ?? 0);
+    const ncat = cg.trim() || null;
+    setProds(a=>a.map(x=>x===p?{ ...x, n:nn, precio:npr, stock:nst, cat:ncat }:x));
+    if (p.id) W("product.update", { id:p.id, name:nn, price_per_kg:npr, stock_pieces:nst, category:ncat });
+  };
   const delProd = (p)=>window.CG.requireAuth(()=>{ setProds(a=>a.filter(x=>x!==p)); if(p.id) W("product.delete",{id:p.id}); }, `¿Eliminar ${p.n}? Autoriza con tu PIN.`);
   return (
     <div>
