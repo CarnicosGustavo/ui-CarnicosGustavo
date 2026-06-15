@@ -9,6 +9,39 @@ const mny  = window.money;
 const mnyk = window.moneyk;
 const SlotC = window.Slot;
 
+// Imprime un ticket REAL del pedido (datos de /api/ticket); si no hay datos, cae a window.print().
+function printTicket(orderId){
+  if(!orderId){ window.print(); return; }
+  fetch("/api/ticket?orderId="+orderId)
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(t){
+      if(!t || t._source==="mock" || !Array.isArray(t.items)){ window.print(); return; }
+      var esc = function(s){ return String(s==null?"":s).replace(/[&<>]/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]; }); };
+      var rows = t.items.map(function(it){
+        var qty = it.quantityKg>0 ? it.quantityKg.toFixed(3)+" kg" : it.quantityPieces+" pz";
+        return "<tr><td>"+esc(it.productName)+"</td><td class=r>"+qty+"</td><td class=r>$"+it.subtotal.toFixed(2)+"</td></tr>";
+      }).join("");
+      var fecha = t.date ? new Date(t.date).toLocaleString("es-MX") : "";
+      var html = "<!doctype html><meta charset=utf-8><title>Ticket "+t.ticketNumber+"</title>"
+        + "<style>*{font-family:ui-monospace,monospace}body{width:300px;margin:0 auto;padding:14px;color:#111}"
+        + "h1{font-size:15px;text-align:center;margin:0 0 2px}.sub{text-align:center;font-size:11px;color:#555;margin-bottom:10px}"
+        + "table{width:100%;border-collapse:collapse;font-size:11px}td{padding:3px 0;border-bottom:1px dashed #ccc}.r{text-align:right}"
+        + ".tot{font-size:13px;font-weight:700;margin-top:8px;display:flex;justify-content:space-between}"
+        + ".badge{display:inline-block;margin-top:8px;font-size:11px;padding:2px 8px;border:1px solid #111;border-radius:4px}</style>"
+        + "<h1>CÁRNICOS GUSTAVO</h1><div class=sub>Ticket "+t.ticketNumber+" · "+esc(fecha)+"<br>"
+        + (t.customerName?("Cliente: "+esc(t.customerName)):"Mostrador")+"</div>"
+        + "<table><thead><tr><td><b>Producto</b></td><td class=r><b>Cant</b></td><td class=r><b>Importe</b></td></tr></thead><tbody>"
+        + rows + "</tbody></table>"
+        + "<div class=tot><span>TOTAL</span><span>$"+t.totalAmount.toFixed(2)+"</span></div>"
+        + "<div class=sub style='margin-top:6px'>"+t.totalKg.toFixed(3)+" kg</div>"
+        + "<div style='text-align:center'><span class=badge>"+esc(t.paymentStatus)+"</span></div>";
+      var w = window.open("", "_blank", "width=360,height=640");
+      if(!w){ window.print(); return; }
+      w.document.write(html); w.document.close(); w.focus(); setTimeout(function(){ w.print(); }, 200);
+    })
+    .catch(function(){ window.print(); });
+}
+
 /* Estado de pedido → tono (mapa de la guía) */
 const ESTADO_TONE = {
   "Pagada":"green", "Lista para cobro":"blue", "Procesando pago":"blue",
@@ -85,14 +118,14 @@ function PedidosScreen({ ai }) {
     [["Pedido","Cliente","Total","Estado","Fecha"], ...data.map(p=>["#"+p.id, p.cliente, p.total, p.estado, p.fecha])]);
 
   const rowMenu = (p) => [
-    { label:"Ver detalle", icon:"eye", onClick:()=>window.print() },
+    { label:"Ver detalle", icon:"eye", onClick:()=>printTicket(p.id) },
     { label:"Editar pedido", icon:"file-pen", onClick:()=>setNuevoPedido(true) },
     ...(p.estado==="Por pesar" || p.estado==="Parcial"
       ? [{ label:"Ir a Pesaje", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 }) }] : []),
     ...(p.estado==="Lista para cobro"
       ? [{ label:"Ir a Pesaje", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 }) }] : []),
     { sep:true },
-    { label:"Imprimir ticket", icon:"printer", onClick:()=>window.print() },
+    { label:"Imprimir ticket", icon:"printer", onClick:()=>printTicket(p.id) },
     { label:"Duplicar", icon:"copy", onClick:()=>setExtra(arr=>[{ ...p, id:360+arr.length }, ...arr]) },
     { label:"Enviar por WhatsApp", icon:"message-circle", onClick:()=>waOpen("", `Pedido #${p.id} de ${p.cliente}`) },
     { sep:true },
@@ -150,7 +183,7 @@ function PedidosScreen({ ai }) {
                   <td style={{ padding:"13px 14px", font:`500 13px/1 ${Fx.mono}`, color:Cx.inkSoft }}>{p.fecha}</td>
                   <td style={{ padding:"13px 14px" }}>
                     <div style={{ display:"flex", gap:7, justifyContent:"center", alignItems:"center" }}>
-                      <RowAct icon="eye" title="Ver detalle" onClick={()=>window.print()} />
+                      <RowAct icon="eye" title="Ver detalle" onClick={()=>printTicket(p.id)} />
                       {(p.estado==="Por pesar"||p.estado==="Parcial") &&
                         <button title="Pesar" onClick={()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 })}
                           style={{ width:34, height:34, borderRadius:8, border:`1px solid ${Cx.amber}`, background:Cx.amberWash,

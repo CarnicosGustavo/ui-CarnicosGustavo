@@ -24,7 +24,9 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 ## Pedidos (lista + detalle)
 - ✅ **Crear pedido** (modal) persiste → `order.create`
 - ✅ CSV / imprimir / ordenar / duplicar (local)
-- 🔧 **Ver detalle / Editar** solo imprime/abre modal vacío → falta detalle real
+- ✅ **Ver detalle / Imprimir ticket** → imprime **ticket real** (`/api/ticket`): productos,
+  cantidades, total, estado de pago (ventana de impresión formateada)
+- 🔧 **Editar** abre modal de Nuevo pedido (no precarga líneas) → falta detalle editable
 - ✅ Cancelar (→cancelled) / Eliminar persisten → `order.update/delete` · ⏳ Editar (replaceItems)
 - 🔧 WhatsApp sin teléfono del cliente (texto genérico)
 
