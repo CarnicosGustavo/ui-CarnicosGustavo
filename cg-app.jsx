@@ -301,6 +301,7 @@ function App() {
     rendimiento: <RendimientoScreen ai={ai} />,
     cobranza: <CobranzaScreen ai={ai} />,
     clientes: <ClientesScreen ai={ai} />,
+    ficha:    <FichaClienteScreen ai={ai} />,
     pos:      <PosScreen ai={ai} />,
     validacion: <ValidacionSaldosScreen ai={ai} />,
     cedis:    <CedisScreen ai={ai} />,

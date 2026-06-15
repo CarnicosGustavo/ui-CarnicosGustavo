@@ -73,8 +73,9 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 ## Clientes (lista + detalle)
 - ✅ **Crear / Editar / Eliminar** persisten → `customer.*`
 - ✅ "Nuevo pedido" → POS **precargando** el cliente
-- 🔧 "Estado de cuenta" → Cobranza sin filtrar
-- ⏳ Ficha 360° (detalle) no existe
+- ✅ **Ficha 360°** (`/api/customer` + `/api/statement`): contacto, KPIs (pedidos/gastado/
+  saldo/precios propios), pedidos recientes y movimientos de cuenta · ruta `ficha`
+- ✅ "Estado de cuenta" y "Ver ficha 360°" → abren la ficha del cliente
 
 ## POS
 - ✅ **Crear pedido** persiste · ✅ dropdowns (cliente/método/lista) selección libre

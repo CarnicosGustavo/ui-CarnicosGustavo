@@ -278,10 +278,11 @@ function ClientesScreen({ ai }) {
                       {c.tel && <RowAct icon="message-circle" color={Cx.green} title="WhatsApp"
                         onClick={()=>waOpen(c.tel, `Hola ${c.nombre}`)} />}
                       <Kebab items={[
+                        { label:"Ver ficha 360°", icon:"id-card", onClick:()=>{ window.CG._fichaId = c.id; goTo("ficha"); } },
                         { label:"Nuevo pedido", icon:"plus", onClick:()=>{ window.__cgPosClient = { id:c.id, nombre:c.nombre }; goTo("pos"); } },
                         { label:"Editar cliente", icon:"file-pen", onClick:()=>setEditC(c) },
                         ...(c.tel ? [{ label:"WhatsApp", icon:"message-circle", onClick:()=>waOpen(c.tel, `Hola ${c.nombre}`) }] : []),
-                        { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("cobranza") },
+                        { label:"Estado de cuenta", icon:"file-text", onClick:()=>{ window.CG._fichaId = c.id; goTo("ficha"); } },
                         { sep:true },
                         { label:"Eliminar", icon:"trash-2", danger:true,
                           onClick:()=>{ if(!window.confirm(`¿Eliminar a ${c.nombre}?`)) return;
@@ -475,6 +476,99 @@ function CobranzaScreen({ ai }) {
   );
 }
 
+/* ---------------- FICHA 360° DEL CLIENTE ---------------- */
+function FichaClienteScreen({ ai }) {
+  const id = window.CG._fichaId;
+  const goTo = (m)=> window.__cgGo && window.__cgGo(m);
+  const [data, setData] = useState(undefined); // undefined=cargando, null=error, obj=ok
+  const [led, setLed] = useState(null);
+  useEffect(()=>{
+    if(!id){ setData(null); return; }
+    fetch("/api/customer?id="+id).then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){ setData(d && d.customer ? d : null); }).catch(function(){ setData(null); });
+    fetch("/api/statement?customerId="+id).then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){ setLed(d && Array.isArray(d.ledger) ? d : null); }).catch(function(){});
+  }, [id]);
+
+  if(!id) return <div><ScreenHead title="Ficha del cliente" desc="Selecciona un cliente desde la lista." /></div>;
+  const c = data && data.customer;
+  return (
+    <div>
+      <ScreenHead title={c ? c.name : "Ficha del cliente"} desc="Vista 360°: contacto, pedidos, saldo y precios propios."
+        right={<>
+          <Btn kind="outline" icon="arrow-left" onClick={()=>goTo("clientes")}>Volver</Btn>
+          <Btn kind="dark" icon="plus" onClick={()=>{ window.__cgPosClient = { id:c.id, nombre:c.name }; goTo("pos"); }}>Nuevo pedido</Btn>
+        </>} />
+      {data===undefined && <Card><div style={{ font:`500 13px/1 ${Fx.ui}`, color:Cx.inkFaint }}>Cargando ficha…</div></Card>}
+      {data===null && <Card><div style={{ font:`500 13px/1 ${Fx.ui}`, color:Cx.red }}>No se pudo cargar la ficha del cliente.</div></Card>}
+      {c && (
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          {/* contacto */}
+          <Card pad={18}>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:18 }}>
+              {[["Contacto", c.contact||"—"],["Teléfono", c.phone||"—"],["Correo", c.email||"—"],["Dirección", c.address||"—"],["Estado", c.status||"—"]].map(([k,v],i)=>(
+                <div key={i} style={{ minWidth:140 }}>
+                  <div style={{ font:`700 10.5px/1 ${Fx.ui}`, letterSpacing:"0.05em", textTransform:"uppercase", color:Cx.inkFaint }}>{k}</div>
+                  <div style={{ font:`600 13.5px/1.3 ${Fx.ui}`, color:Cx.ink, marginTop:4 }}>{v}</div>
+                </div>
+              ))}
+              {c.phone && <Btn kind="green" size="sm" icon="message-circle" onClick={()=>waOpen(c.phone, `Hola ${c.name}`)} style={{ marginLeft:"auto", alignSelf:"center" }}>WhatsApp</Btn>}
+            </div>
+          </Card>
+          {/* KPIs */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:12 }}>
+            {[["Pedidos", String(data.totalOrders), Cx.ink],["Gastado", mny(data.totalSpent), Cx.green],
+              ["Saldo", mny(data.balance), data.balance>0?Cx.red:Cx.ink],["Precios propios", String(data.customPriceCount), Cx.ink]].map(([k,v,col],i)=>(
+              <Card key={i} pad={16}>
+                <div style={{ font:`700 10.5px/1 ${Fx.ui}`, letterSpacing:"0.05em", textTransform:"uppercase", color:Cx.inkFaint, marginBottom:6 }}>{k}</div>
+                <Stat value={v} color={col} size={26} />
+              </Card>
+            ))}
+          </div>
+          {/* pedidos recientes */}
+          <Card pad={0} style={{ overflow:"hidden" }}>
+            <div style={{ padding:"14px 16px", borderBottom:`1px solid ${Cx.line}`, font:`700 14px/1 ${Fx.ui}`, color:Cx.ink }}>Pedidos recientes</div>
+            {(data.orders||[]).length===0 ? <div style={{ padding:16, font:`500 13px/1 ${Fx.ui}`, color:Cx.inkFaint }}>Sin pedidos.</div> :
+              <div style={{ maxHeight:280, overflowY:"auto" }}>
+                {data.orders.map(function(o){ return (
+                  <div key={o.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"11px 16px", borderTop:`1px solid ${Cx.lineSoft}` }}>
+                    <span style={{ font:`700 12.5px/1 ${Fx.mono}`, color:Cx.ink }}>#{o.id}</span>
+                    <span style={{ font:`500 11.5px/1 ${Fx.mono}`, color:Cx.inkFaint }}>{fechaCorta(o.fecha)}</span>
+                    <Badge tone={ESTADO_TONE[estadoLbl(o.status)]||"ghost"}>{estadoLbl(o.status)}</Badge>
+                    <span style={{ font:`700 13px/1 ${Fx.mono}`, color:Cx.ink }}>{mny(o.total)}</span>
+                  </div>
+                ); })}
+              </div>}
+          </Card>
+          {/* ledger */}
+          {led && led.ledger && led.ledger.length>0 && (
+            <Card pad={0} style={{ overflow:"hidden" }}>
+              <div style={{ padding:"14px 16px", borderBottom:`1px solid ${Cx.line}`, font:`700 14px/1 ${Fx.ui}`, color:Cx.ink }}>Movimientos de cuenta</div>
+              <div style={{ maxHeight:260, overflowY:"auto" }}>
+                {led.ledger.map(function(m){ return (
+                  <div key={m.tipo+"-"+m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", borderTop:`1px solid ${Cx.lineSoft}` }}>
+                    <span style={{ font:`600 12.5px/1.2 ${Fx.ui}`, color:Cx.ink, flex:1, minWidth:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.concepto}</span>
+                    <span style={{ font:`500 10.5px/1 ${Fx.mono}`, color:Cx.inkFaint, margin:"0 10px" }}>{m.fecha||""}</span>
+                    <span style={{ font:`700 13px/1 ${Fx.mono}`, color: m.tipo==="abono"?Cx.green:Cx.ink80 }}>{m.tipo==="abono"?"−"+mny(m.abono):mny(m.cargo)}</span>
+                  </div>
+                ); })}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+// etiqueta de estado a partir del status crudo de la DB (para el badge de la ficha)
+function estadoLbl(s){
+  switch(s){ case "COMPLETADA": case "completed": return "Pagada"; case "LISTA_PARA_COBRO": return "Lista para cobro";
+    case "PENDIENTE_PESAJE": return "Por pesar"; case "PARCIAL_DISPONIBLE": return "Parcial";
+    case "cancelled": case "CANCELADA": return "Cancelada"; default: return "Pendiente"; }
+}
+function fechaCorta(d){ if(!d) return ""; try { return new Date(d).toLocaleDateString("es-MX", { day:"2-digit", month:"2-digit" }); } catch(e){ return ""; } }
+
 window.PedidosScreen = PedidosScreen;
 window.ClientesScreen = ClientesScreen;
 window.CobranzaScreen = CobranzaScreen;
+window.FichaClienteScreen = FichaClienteScreen;
