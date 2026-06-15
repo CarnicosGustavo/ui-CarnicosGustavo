@@ -71,9 +71,9 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - 🔧 editar solo nombre (prompt); falta editar precio/stock/categoría
 
 ## Precios por cliente
-- ✅ precios editables, guardar (feedback local)
-- 🔧 selector de cliente cicla (debería dropdown)
-- ⏳ **Guardar** no persiste → `prices.bulkUpsert` (falta `customerId` + `productId`)
+- ✅ **dropdown de cliente** + carga precios del cliente (`/api/customer-prices`)
+- ✅ precio/kg editable, filas con precio propio resaltadas
+- ✅ **Guardar** persiste → `prices.bulkUpsert`
 
 ## Inventario Frío
 - ✅ **A frío / A fresco** con **diálogo de kg/piezas** → `cold.toFrozen/toFresh`
