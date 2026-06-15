@@ -60,6 +60,8 @@ npm test         # smoke test (jsdom)
 Env (Vercel): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CG_USER_UID` (opcional).
 
 ## 📚 Documentación clave (en `docs/`)
+- `DESIGN_SYSTEM.md` — **sistema de diseño (v2)**: tokens, tipografía, componentes y
+  patrones para diseñar nuevas interfaces (evolución del diseño actual, React+Vite).
 - `MONTAJE_VITE.md` — arquitectura del montaje (cómo se conserva el JSX en Vite).
 - `M1_GUIA_UI_UX.md` — guía funcional exhaustiva del Proyecto 1 (referencia de UI/UX).
 - `IMPLEMENTACION_DESDE_M1.md` — mapeo pantalla→endpoint + contrato API tRPC del P1.
