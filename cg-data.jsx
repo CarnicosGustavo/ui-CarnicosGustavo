@@ -253,6 +253,47 @@ CG.ops = {
   },
 };
 
+/* ---------- Validación de saldos legacy (MyBusinessPOS → crédito) ----------
+   Fuente real: public.credit_balances (snapshot legacy) + staging.legacy_credit_clientes
+   (código MBPOS) + credit_charges/payments (documentos). Mock de respaldo abajo;
+   api/cg-data.js lo reemplaza con datos reales (clave top-level `validacion`).
+   Cada fila lleva `customerId` (real) para poder validar contra Supabase. */
+CG.validacion = [
+  { id:"000412", customerId:null, nombre:"Abarrotes El Sol", saldo:128450.50, limite:150000, dias:30, ndoc:14, validado:false,
+    docs:[
+      { fecha:"2022-01-12", venc:"2022-02-11", tipo:"FAC", ref:"A-7740", importe:42500, saldo:42500, estado:"Vencido", obs:"Pedido quincenal" },
+      { fecha:"2022-02-03", venc:"2022-03-05", tipo:"FAC", ref:"A-7811", importe:38900, saldo:31450.50, estado:"Parcial", obs:"Abonó $7,449.50" },
+      { fecha:"2022-02-20", venc:"2022-03-22", tipo:"NC",  ref:"NC-220", importe:-4200, saldo:-4200, estado:"Aplicado", obs:"Devolución pierna" },
+      { fecha:"2022-03-08", venc:"2022-04-07", tipo:"FAC", ref:"A-7903", importe:58700, saldo:58700, estado:"Vencido", obs:"" },
+    ]},
+  { id:"000118", customerId:null, nombre:"La Carnicería Don Luis", saldo:89200, limite:100000, dias:15, ndoc:9, validado:false,
+    docs:[
+      { fecha:"2022-01-25", venc:"2022-02-09", tipo:"FAC", ref:"A-7765", importe:51200, saldo:51200, estado:"Vencido", obs:"" },
+      { fecha:"2022-02-14", venc:"2022-03-01", tipo:"FAC", ref:"A-7842", importe:38000, saldo:38000, estado:"Vencido", obs:"Confirmar con cliente" },
+    ]},
+  { id:"000507", customerId:null, nombre:"Super Carnes del Valle", saldo:243800, limite:250000, dias:30, ndoc:22, validado:false,
+    docs:[
+      { fecha:"2022-01-05", venc:"2022-02-04", tipo:"FAC", ref:"A-7701", importe:120000, saldo:120000, estado:"Vencido", obs:"Cliente mayoreo grande" },
+      { fecha:"2022-02-18", venc:"2022-03-20", tipo:"FAC", ref:"A-7888", importe:123800, saldo:123800, estado:"Vencido", obs:"" },
+    ]},
+  { id:"000233", customerId:null, nombre:"Tortas y Carnes Lupita", saldo:34600, limite:40000, dias:15, ndoc:6, validado:false,
+    docs:[
+      { fecha:"2022-02-01", venc:"2022-02-16", tipo:"FAC", ref:"A-7790", importe:34600, saldo:34600, estado:"Vencido", obs:"" },
+    ]},
+  { id:"000341", customerId:null, nombre:"Mercado San Juan L-12", saldo:67250, limite:80000, dias:30, ndoc:11, validado:false,
+    docs:[
+      { fecha:"2022-01-19", venc:"2022-02-18", tipo:"FAC", ref:"A-7755", importe:40250, saldo:40250, estado:"Vencido", obs:"" },
+      { fecha:"2022-02-22", venc:"2022-03-24", tipo:"FAC", ref:"A-7901", importe:27000, saldo:27000, estado:"Vencido", obs:"Local nuevo" },
+    ]},
+  { id:"000089", customerId:null, nombre:"Cocina Económica Mary", saldo:12800, limite:20000, dias:8, ndoc:4, validado:true,
+    validadoPor:"Gustavo", validadoAt:"2026-06-10", saldoActual:12800,
+    docs:[
+      { fecha:"2022-02-10", venc:"2022-02-18", tipo:"FAC", ref:"A-7820", importe:12800, saldo:12800, estado:"Vencido", obs:"" },
+    ]},
+  { id:"000620", customerId:null, nombre:"Distribuidora El Novillo", saldo:0, limite:120000, dias:30, ndoc:0, validado:false,
+    docs:[] },
+];
+
 /* ---------- Datos de RECETAS (núcleo del sistema) ----------
    Fiel a la semilla real del Configurador (catalog.js · pesajes 3-jun-2026). */
 CG.catColors = {
@@ -543,6 +584,7 @@ CG.refresh = function () {
       if (payload.config) cgDeepMerge(CG.config, payload.config);
       if (payload.ops) cgDeepMerge(CG.ops, payload.ops);
       if (payload.recetas) cgDeepMerge(CG.recetas, payload.recetas);
+      if (Array.isArray(payload.validacion)) CG.validacion = payload.validacion; // array: reemplazo directo
       CG.dataReady = true;
       window.dispatchEvent(new Event("cg:data"));
     })
