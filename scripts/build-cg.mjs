@@ -13,6 +13,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FILES = [
 	"cg-data",
 	"cg-notif",
+	"cg-auth",
 	"cg-ui",
 	"cg-antonella",
 	"cg-ai-kit",
