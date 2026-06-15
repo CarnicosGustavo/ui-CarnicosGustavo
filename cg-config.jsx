@@ -353,6 +353,14 @@ function CajaScreen({ ai }) {
   const [txs, setTxs] = useState(()=> ((window.CG.config && window.CG.config.caja) || []).slice());
   const delTx = (i, t)=>{ setTxs(a=>a.filter((_,j)=>j!==i));
     if (t.id && window.CG.write) window.CG.write("tx.delete",{ id:t.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); };
+  const editTx = (i, t)=>{
+    const d = window.prompt("Descripción", t.desc); if (d===null) return;
+    const a = window.prompt("Importe ($)", String(t.importe)); if (a===null) return;
+    const imp = parseFloat(a);
+    const nd = (d.trim()||t.desc), ni = (imp>0?imp:t.importe);
+    setTxs(arr=>arr.map((x,j)=>j===i?{ ...x, desc:nd, importe:ni }:x));
+    if (t.id && window.CG.write) window.CG.write("tx.update",{ id:t.id, description:nd, amount:Math.round(ni*100) }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+  };
   const [desc, setDesc] = useState("");
   const [cat, setCat] = useState("");
   const [tipo, setTipo] = useState("Ingreso");
@@ -388,7 +396,7 @@ function CajaScreen({ ai }) {
                 <td style={{ padding:"11px 8px", textAlign:"right", font:`700 13px/1 ${Fc.mono}`, color: t.tipo==="Ingreso"?Cc.green:Cc.red }}>
                   {t.tipo==="Egreso"?"–":""}{m$(t.importe)}</td>
                 <td style={{ padding:"11px 8px", textAlign:"center" }}>
-                  <IconBtn icon="trash-2" color={Cc.red} onClick={()=>delTx(i,t)} /></td>
+                  <IconBtn icon="file-pen" color={Cc.inkSoft} onClick={()=>editTx(i,t)} /><IconBtn icon="trash-2" color={Cc.red} onClick={()=>delTx(i,t)} /></td>
               </tr>
             ))}
           </tbody>
