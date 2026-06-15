@@ -19,5 +19,14 @@
         .then(function (r) { return r.json(); })
         .catch(function () { return { error: "sin conexión" }; });
     },
+    // Importa el saldo VALIDADO a cobranza (crea el cargo "Saldo inicial"). Atómico.
+    importar: function (customerId, usuario) {
+      return fetch("/api/validacion", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "import", customerId: customerId, usuario: usuario || null }),
+      })
+        .then(function (r) { return r.json(); })
+        .catch(function () { return { error: "sin conexión" }; });
+    },
   };
 })();
