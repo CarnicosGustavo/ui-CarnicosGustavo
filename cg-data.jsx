@@ -547,6 +547,19 @@ CG.refresh = function () {
 };
 if (typeof window !== "undefined" && typeof window.fetch === "function") CG.refresh();
 
+// iAntonella: POST /api/antonella { question, module }. Devuelve texto real si hay
+// ANTHROPIC_API_KEY en el servidor; si no, resuelve null y el chat usa su respuesta mock.
+CG.ask = function (question, module) {
+  return fetch("/api/antonella", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: question, module: module || "panel" }),
+  })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return d && d.text ? d.text : null; })
+    .catch(function () { return null; });
+};
+
 // Escritura: POST /api/write { op, ...params }. Devuelve {ok,...} o {error}.
 CG.write = function (op, params) {
   return fetch("/api/write", {

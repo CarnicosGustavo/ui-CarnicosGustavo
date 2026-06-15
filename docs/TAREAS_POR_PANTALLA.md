@@ -10,7 +10,8 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ Assets servidos desde `public/assets/` (antes 404 en deploy)
 - ✅ Datos reales vía `/api/cg-data` (lectura); `CG.write` (escritura)
 - 🔧 Avatar/Perfil del header → abre Perfil (ok); revisar menú de usuario
-- ⏳ Antonella (dock/chat): respuestas mock → cablear `antonella.chat`
+- ✅ Antonella (dock/chat): `CG.ask`→`/api/antonella` (Anthropic real si hay
+  `ANTHROPIC_API_KEY`; si no, usa respuesta mock). Falta tool-use/executeAction (M1)
 
 ## Panel
 - ✅ Lectura (KPIs, categorías, flujo) · ✅ ocultar/mostrar montos

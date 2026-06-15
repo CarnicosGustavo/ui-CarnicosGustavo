@@ -134,8 +134,14 @@ function AntonellaDock({ moduleId, pending, open, setOpen, seed, onSeedConsumed 
 
   const reply = (q) => {
     const key = q.trim().toLowerCase();
-    const r = chat.replies[key] || chat.replies.default;
-    setTimeout(()=> setMsgs(m=>[...m, { from:"ai", text:r }]), 380);
+    const fallback = chat.replies[key] || chat.replies.default;
+    if (window.CG.ask) {
+      window.CG.ask(q, moduleId)
+        .then(function(ans){ setMsgs(m=>[...m, { from:"ai", text: ans || fallback }]); })
+        .catch(function(){ setMsgs(m=>[...m, { from:"ai", text: fallback }]); });
+    } else {
+      setTimeout(()=> setMsgs(m=>[...m, { from:"ai", text: fallback }]), 380);
+    }
   };
   const send = (q) => {
     const v = (q ?? text).trim(); if(!v) return;
