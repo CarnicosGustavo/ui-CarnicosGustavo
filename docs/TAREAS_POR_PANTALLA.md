@@ -33,14 +33,14 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ⏳ **Despiezar / Despiezar N** no persiste → `products.processDisassembly`
 
 ## Báscula
-- ✅ Recipientes/tara/neto, navegación de artículos (local)
-- ⏳ **Registrar peso** no persiste → `order.weighItem` (necesita `orderItemId` real)
-- 💡 traer lista de items con id en `data.bascula`
+- ✅ Recipientes/tara/neto, navegación de artículos
+- ✅ **Registrar peso** persiste → `order.weighItem` (recalcula total/estado; pasa a cobro al terminar)
 
 ## Cobro
-- ✅ Precio/kg editable, método, total (local)
-- ⏳ **Cobrar** no persiste → `order.priceAndCharge` (precios + estado + transacción/crédito)
-- 💡 traer `orderId`/`orderItemId` en `data.cobro`; descuento de stock a validar
+- ✅ Precio/kg editable, método, total
+- ✅ **Cobrar** persiste → `order.priceAndCharge` (precios + COMPLETADA + transacción/crédito)
+- 🔧 **descuento de stock** NO se hace aún (a validar antes de activarlo)
+- 🔧 UI single-line (1 precio); pedidos multi-línea aplican el mismo input al 1º
 
 ## Rendimiento
 - ✅ Proyectar/Guardar/Calibrar (local + nav)
@@ -48,7 +48,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Cobranza
 - ✅ **Abonar** persiste → `abono` · ✅ **Estado de cuenta** (modal) · ✅ WhatsApp
-- ⏳ **Capturar ticket viejo** (header) → `cargo` (no cableado)
+- ✅ **Capturar ticket viejo** (modal cliente/monto/concepto) → `cargo`
 - 🔧 "Ver pedidos a crédito" → Pedidos sin filtrar por cliente
 
 ## Clientes (lista + detalle)
@@ -67,8 +67,8 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ⏳ (opcional, alto esfuerzo) mapear a DB + `inventory.recipes*`
 
 ## Productos
-- ✅ buscar/agregar/editar/borrar (local) · importar (file picker)
-- ⏳ **no persisten** → `products.create/update/delete` (admin)
+- ✅ buscar · ✅ **agregar/editar/borrar** persisten → `product.*` · importar (file picker)
+- 🔧 editar solo nombre (prompt); falta editar precio/stock/categoría
 
 ## Precios por cliente
 - ✅ precios editables, guardar (feedback local)
