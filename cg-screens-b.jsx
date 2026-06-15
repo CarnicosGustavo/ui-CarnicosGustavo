@@ -64,7 +64,8 @@ function DespieceScreen({ ai }) {
           </div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:11 }}>
-          {d.piezas.map((pz,i)=>(
+          {/* Solo las piezas de la receta del canal seleccionado (fallback: piezas del americano). */}
+          {(canal.piezas || d.piezas).map((pz,i)=>(
             <div key={i} style={{ border:`1px solid ${pz.hijo?Cb.red:Cb.line}`, borderRadius:12, padding:"13px 14px",
               background: pz.hijo?Cb.redWash:Cb.paper2 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>

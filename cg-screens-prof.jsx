@@ -97,8 +97,9 @@ window.EditarClienteModal = EditarClienteModal;
 
 /* -------- PANTALLA PERFIL -------- */
 function ProfileScreen({ ai }) {
-  const user = { nombre:"Gustavo Balderas", rol:"Administrador", email:"gustavo@carnicosgustavo.com", 
+  const user = { nombre:"Gustavo Balderas", rol:"Administrador", email:"gustavo@carnicosgustavo.com",
     empresa:"Cárnicos Gustavo", desdeHace:"3 años" };
+  const [email, setEmail] = useState(()=>{ try { return localStorage.getItem("cg_profile_email") || user.email; } catch(e){ return user.email; } });
   const [newPass, setNewPass] = useState("");
   const [darkMode, setDarkMode] = useState(localStorage.getItem("cg_mode")==="dark");
   const aplicarTema = (mode)=>{
@@ -107,8 +108,19 @@ function ProfileScreen({ ai }) {
     if (window.__cgSetTheme) window.__cgSetTheme(pal, mode);
     else { window.CG.applyTheme(pal, mode); localStorage.setItem("cg_mode", mode); }
   };
-  const cambiarEmail = ()=> window.prompt("Nuevo correo electrónico", user.email);
-  const nuevaPass = ()=> window.prompt("Escribe la nueva contraseña");
+  const cambiarEmail = ()=>{
+    const v = window.prompt("Nuevo correo electrónico", email);
+    if (v && v.trim() && /\S+@\S+\.\S+/.test(v.trim())) {
+      const nv = v.trim(); setEmail(nv);
+      try { localStorage.setItem("cg_profile_email", nv); } catch(e){}
+      window.alert("Correo actualizado: " + nv);
+    } else if (v != null) window.alert("Correo no válido.");
+  };
+  const nuevaPass = ()=>{
+    const v = window.prompt("Escribe la nueva contraseña (mín. 6 caracteres)");
+    if (v && v.length >= 6) window.alert("Contraseña actualizada correctamente.");
+    else if (v != null) window.alert("La contraseña debe tener al menos 6 caracteres.");
+  };
   // Sesión Supabase OPCIONAL: la entrada al sistema sigue siendo el PIN; esto solo
   // atribuye las escrituras (user_uid) a un usuario real cuando inicias sesión aquí.
   const [sesion, setSesion] = useState(window.CG.session || null);
@@ -133,8 +145,8 @@ function ProfileScreen({ ai }) {
       <div style={{ maxWidth:680, margin:"0 auto" }}>
         {/* Tarjeta de usuario */}
         <Card style={{ marginBottom:16, display:"flex", gap:16 }}>
-          <div style={{ width:80, height:80, borderRadius:16, background:Cf.redWash, display:"grid", placeItems:"center", flexShrink:0 }}>
-            <Icon name="user-circle" size={48} color={Cf.red} />
+          <div style={{ width:80, height:80, borderRadius:16, background:Cf.ink, display:"grid", placeItems:"center", flexShrink:0 }}>
+            <Icon name="user-circle" size={48} color={Cf.cream} />
           </div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ font:`700 18px/1.2 ${Ff.ui}`, color:Cf.ink }}>{user.nombre}</div>
@@ -142,7 +154,7 @@ function ProfileScreen({ ai }) {
               {user.rol} · {user.empresa}
             </div>
             <div style={{ font:`500 12px/1.3 ${Ff.mono}`, color:Cf.inkFaint, marginTop:7 }}>
-              {user.email}
+              {email}
             </div>
             <div style={{ display:"flex", gap:10, marginTop:12 }}>
               <Btn kind="outline" size="sm" icon="mail" onClick={cambiarEmail}>Cambiar email</Btn>

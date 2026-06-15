@@ -13,7 +13,9 @@ const TONE = {
 
 /* Slot inline de Antonella dentro de un módulo */
 function AntonellaSlot({ data, onChip, onOpen, onNav }) {
-  const [open, setOpen] = useState(true);
+  // Colapsado por default: muestra solo el encabezado compacto (avatar + título)
+  // con un botón para expandir. Se desplegaba abierto antes; feedback 15-jun.
+  const [open, setOpen] = useState(false);
   if (!data) return null;
   const t = TONE[data.tone] || TONE.sugerencia;
   const doAction = (a) => {

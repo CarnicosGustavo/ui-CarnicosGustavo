@@ -125,10 +125,21 @@ CG.data = {
     ],
   },
   despiece: {
+    // Cada canal define las piezas de SU receta; la pantalla solo muestra esas.
+    // "ame" usa la lista por default de abajo (piezas:[...]); esp/lom traen las suyas.
+    // (Distribución demo del prototipo; las recetas reales llegan de Supabase.)
     canales:[
       { id:"ame", nombre:"Americano",           disp:49, kg:105,  tono:"red"   },
-      { id:"esp", nombre:"Nacional · Espilomo", disp:30, kg:52.5, tono:"blue"  },
-      { id:"lom", nombre:"Nacional · Lomo",     disp:30, kg:52.5, tono:"green" },
+      { id:"esp", nombre:"Nacional · Espilomo", disp:30, kg:52.5, tono:"blue", piezas:[
+        { n:"Espinazo",pz:1,pct:9.0,ped:0 },{ n:"Costilla espilomo",pz:1,pct:7.5,ped:0 },
+        { n:"Pierna",pz:1,pct:22.0,ped:0,hijo:true },{ n:"Cuero",pz:1,pct:4.5,ped:0 },
+        { n:"Grasa",pz:1,pct:5.0,ped:0 },
+      ] },
+      { id:"lom", nombre:"Nacional · Lomo",     disp:30, kg:52.5, tono:"green", piezas:[
+        { n:"Lomo",pz:1,pct:16.0,ped:0 },{ n:"Costillar",pz:1,pct:6.0,ped:0 },
+        { n:"Falda",pz:1,pct:5.5,ped:0 },{ n:"Pierna",pz:1,pct:22.0,ped:0,hijo:true },
+        { n:"Filete",pz:1,pct:2.0,ped:0 },
+      ] },
     ],
     piezas:[
       { n:"Cabeza",pz:1,pct:3.6,ped:0 },{ n:"Costillar",pz:2,pct:5.7,ped:0 },
@@ -369,7 +380,7 @@ CG.antonella = {
     acciones:[{ label:"Ir a cobranza", icon:"hand-coins", go:"cobranza" },"Detalle de margen"] }},
   compra:{ slot:{ tone:"aviso", titulo:"Revisa la merma al recibir",
     texto:"Compraste 8,510 kg en pie (80 canales). Aún no registras kg recibidos en CEDIS — sin eso no puedo calcular la merma real ni el costo por canal de hoy.",
-    acciones:[{ label:"Capturar kg recibidos", icon:"scale", go:"compra" },"¿Merma normal?"] }},
+    acciones:[{ label:"Capturar kg recibidos", icon:"scale", go:"cedis" },"¿Merma normal?"] }},
   despiece:{ slot:{ tone:"alerta", titulo:"Cuidado con despiezar de más",
     texto:"Tienes 49 canales americanos disponibles y 0 pedidos que demanden estas piezas. Despiezar genera piezas sin destino. Te conviene esperar pedidos o despiezar solo lo vendido.",
     acciones:[{ label:"Ver pedidos abiertos", icon:"receipt-text", go:"pedidos" },"Despiezar solo lo pedido"] }},
