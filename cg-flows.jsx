@@ -8,15 +8,20 @@ const Ff = window.CG.font;
 const mnyF = (v) => (window.money ? window.money(v) : "$" + (v||0).toLocaleString("es-MX", { minimumFractionDigits:2, maximumFractionDigits:2 }));
 
 /* ---------------- NUEVO PEDIDO ---------------- */
-function NuevoPedidoModal({ open, onClose, onCreate }) {
+function NuevoPedidoModal({ open, onClose, onCreate, initial, onSave }) {
   const clientes = window.CG.ops.clientes;
   const catalogo = window.CG.ops.pos.catalogo;
+  const editing = !!initial;
   const [cliente, setCliente] = useState("");
   const [lista, setLista] = useState(window.CG.ops.pos.listas[0]);
   const [items, setItems] = useState([]);
   const [pick, setPick] = useState("");
 
-  useEffect(()=>{ if(open){ setCliente(""); setItems([]); setPick(""); setLista(window.CG.ops.pos.listas[0]); } }, [open]);
+  useEffect(()=>{ if(open){
+    if(initial){ setCliente(initial.cliente||""); setItems((initial.items||[]).map(x=>({ ...x }))); }
+    else { setCliente(""); setItems([]); }
+    setPick(""); setLista(window.CG.ops.pos.listas[0]);
+  } }, [open, initial]);
 
   const addItem = (name) => {
     const p = catalogo.find(c=>c.n===name); if(!p) return;
@@ -35,14 +40,14 @@ function NuevoPedidoModal({ open, onClose, onCreate }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} icon="receipt-text" title="Nuevo pedido" width={620}
-      subtitle="Selecciona el cliente, agrega artículos y crea el pedido. iAntonella validará stock y pesaje."
+    <Modal open={open} onClose={onClose} icon="receipt-text" title={editing?"Editar pedido":"Nuevo pedido"} width={620}
+      subtitle={editing?"Ajusta el cliente y los artículos. Al guardar se reemplazan las líneas del pedido.":"Selecciona el cliente, agrega artículos y crea el pedido. iAntonella validará stock y pesaje."}
       footer={
         <>
           <Btn kind="outline" onClick={onClose}>Cancelar</Btn>
-          <Btn kind="primary" icon="check" onClick={()=>{ onCreate && onCreate({ cliente, lista, items, total }); onClose(); }}
+          <Btn kind="primary" icon="check" onClick={()=>{ if(editing){ onSave && onSave({ cliente, lista, items, total }); } else { onCreate && onCreate({ cliente, lista, items, total }); } onClose(); }}
             style={{ opacity: cliente && items.length ? 1 : 0.5, pointerEvents: cliente && items.length ? "auto" : "none" }}>
-            Crear pedido
+            {editing?"Guardar cambios":"Crear pedido"}
           </Btn>
         </>
       }>

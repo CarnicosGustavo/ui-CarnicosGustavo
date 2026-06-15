@@ -27,8 +27,10 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ CSV / imprimir / ordenar / duplicar (local)
 - ✅ **Ver detalle / Imprimir ticket** → imprime **ticket real** (`/api/ticket`): productos,
   cantidades, total, estado de pago (ventana de impresión formateada)
-- 🔧 **Editar** abre modal de Nuevo pedido (no precarga líneas) → falta detalle editable
-- ✅ Cancelar (→cancelled) / Eliminar persisten → `order.update/delete` · ⏳ Editar (replaceItems)
+- ✅ **Editar pedido** precarga las líneas reales (`/api/order`) en el modal y guarda →
+  `order.replaceItems` (reemplaza líneas, recalcula total/estado, ajusta cargo/transacción)
+- ✅ Cancelar (→cancelled) / Eliminar persisten → `order.update/delete`
+- 🔧 editar líneas por PESO mantiene su kg pero el modal solo ajusta piezas (pesaje recaptura)
 - 🔧 WhatsApp sin teléfono del cliente (texto genérico)
 
 ## Despiece

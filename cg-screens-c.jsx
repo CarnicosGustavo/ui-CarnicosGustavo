@@ -103,6 +103,12 @@ const thBase = (align)=>({ textAlign:align, font:`700 11px/1 ${Fx.ui}`, letterSp
 function PedidosScreen({ ai }) {
   const [filtro, setFiltro] = useState("Todos");
   const [nuevoPedido, setNuevoPedido] = useState(false);
+  const [editPedido, setEditPedido] = useState(null); // {id, cliente, customerId, items} o null
+  const abrirEditar = (p)=>{
+    fetch("/api/order?id="+p.id).then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){ if(d && Array.isArray(d.items) && d.items.length) setEditPedido({ id:p.id, cliente:d.cliente, customerId:d.customerId, items:d.items }); else setNuevoPedido(true); })
+      .catch(function(){ setNuevoPedido(true); });
+  };
   const [pesaje, setPesaje] = useState(null);     // {n, pedido, precio} o null
   const [extra, setExtra] = useState([]);          // pedidos creados en sesión
   const [orden, setOrden] = useState(null);        // "total" | "fecha" | null
@@ -119,7 +125,7 @@ function PedidosScreen({ ai }) {
 
   const rowMenu = (p) => [
     { label:"Ver detalle", icon:"eye", onClick:()=>printTicket(p.id) },
-    { label:"Editar pedido", icon:"file-pen", onClick:()=>setNuevoPedido(true) },
+    { label:"Editar pedido", icon:"file-pen", onClick:()=>abrirEditar(p) },
     ...(p.estado==="Por pesar" || p.estado==="Parcial"
       ? [{ label:"Ir a Pesaje", icon:"scale", onClick:()=>setPesaje({ n:"PIERNA", pedido:`#${p.id}`, precio:70 }) }] : []),
     ...(p.estado==="Lista para cobro"
@@ -199,7 +205,17 @@ function PedidosScreen({ ai }) {
         </div>
       </Card>
 
-      <NuevoPedidoModal open={nuevoPedido} onClose={()=>setNuevoPedido(false)}
+      <NuevoPedidoModal open={nuevoPedido || !!editPedido} onClose={()=>{ setNuevoPedido(false); setEditPedido(null); }}
+        initial={editPedido}
+        onSave={(o)=>{
+          if(!editPedido) return;
+          const cust = (window.CG.ops.clientes||[]).find(c=>c.nombre===o.cliente);
+          const cat = (window.CG.ops.pos && window.CG.ops.pos.catalogo) || [];
+          const items = o.items.map(function(it){ const pr = it.productId ? null : cat.find(c=>c.n===it.n);
+            return { productId: it.productId || (pr?pr.id:null), productName:it.n, pieces:it.pz, kg: it.kg||0, price:it.precio, byWeight: it.disp==="pesaje" }; });
+          if(window.CG.write) window.CG.write("order.replaceItems", { orderId:editPedido.id, items, customerId: cust?cust.id:editPedido.customerId })
+            .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+        }}
         onCreate={(o)=>{ const id = 360 + extra.length;
           setExtra(arr => [{ id, cliente:o.cliente, total:o.total, items:o.items.length,
             estado: o.items.some(x=>x.disp==="pesaje"||x.disp==="despiece")?"Por pesar":"Lista para cobro", fecha:"12/06" }, ...arr]);
