@@ -901,41 +901,6 @@ export default async function handler(req, res) {
 				return ok({ orderId: p.orderId, total, inventoryDeducted: !alreadyCharged });
 			}
 
-			// ---------- VALIDACIÓN DE SALDOS LEGACY (MBPOS → crédito) ----------
-			// Promueve un saldo del snapshot (credit_balances) al sistema vivo:
-			//   1) upsert credit_accounts (límite + plazo)
-			//   2) siembra el saldo como credit_charges (source='legacy') — idempotente
-			//   3) marca validado en credit_balances (validated_at / validated_by)
-			// Requiere que credit_balances sea TABLA y tenga las columnas validated_*.
-			case "legacy.validate": {
-				if (!p.customerId) return fail("customerId requerido");
-				const limit = Number(p.creditLimit || 0).toFixed(2);
-				const terms = Math.round(Number(p.termsDays) || 0);
-				// 1) cuenta de crédito (upsert por customer_id)
-				const { data: ex } = await db.from("credit_accounts").select("id").eq("customer_id", p.customerId).limit(1);
-				if (ex && ex[0]) await db.from("credit_accounts").update({ credit_limit: limit, terms_days: terms, updated_at: new Date().toISOString() }).eq("id", ex[0].id);
-				else await db.from("credit_accounts").insert({ customer_id: p.customerId, credit_limit: limit, terms_days: terms });
-				// 2) saldo inicial → cargo (no duplicar si ya se sembró)
-				const saldo = Number(p.saldo || 0);
-				if (saldo > 0) {
-					const { data: seeded } = await db.from("credit_charges").select("id")
-						.eq("customer_id", p.customerId).eq("source", "legacy").limit(1);
-					if (!seeded || !seeded[0]) {
-						const { error } = await db.from("credit_charges").insert({
-							customer_id: p.customerId, amount: saldo.toFixed(2),
-							concept: "Saldo inicial (migración MBPOS)", source: "legacy", charge_date: today(),
-						});
-						if (error) throw error;
-					}
-				}
-				// 3) marcar validado en el snapshot
-				const { error: eMark } = await db.from("credit_balances")
-					.update({ validated_at: new Date().toISOString(), validated_by: p.validatedBy || ownerUid })
-					.eq("customer_id", p.customerId);
-				if (eMark) throw eMark;
-				return ok({ customerId: p.customerId });
-			}
-
 			default:
 				return fail(`Operación desconocida: ${op}`, 400);
 		}

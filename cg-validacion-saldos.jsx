@@ -8,11 +8,13 @@ const Fv = window.CG.font;
 const mnyV  = window.money;       // "$1,500.00"
 const mnyVk = window.moneyk;      // "$1.5k"
 
-/* ---- Datos legacy: fuente viva en window.CG.validacion (cg-data.jsx → api/cg-data.js).
-   Con Supabase trae public.credit_balances + código MBPOS + documentos; sin conexión,
-   conserva el mock de respaldo definido en cg-data.jsx. ---- */
-function getLegacy() {
-  return (window.CG && Array.isArray(window.CG.validacion)) ? window.CG.validacion : [];
+/* ---- Datos legacy: capa async window.CG.validacion (cg-validacion-data.jsx → /api/validacion).
+   list() lee public.v_validacion_saldos / v_validacion_docs (exponen staging.legacy_credit_*);
+   validate() llama al RPC validar_saldo_legacy. Sin backend, list() resuelve []. ---- */
+function loadLegacy(setRows) {
+  if (window.CG && window.CG.validacion && typeof window.CG.validacion.list === "function") {
+    window.CG.validacion.list().then(function (list) { setRows(Array.isArray(list) ? list : []); });
+  }
 }
 
 /* badge por estado de cliente */
@@ -28,36 +30,29 @@ const DOC_TONE = { "Vencido":"red", "Parcial":"amber", "Aplicado":"blue", "Pagad
    Pantalla principal — controla vista lista / detalle
    ============================================================ */
 function ValidacionSaldosScreen({ ai }) {
-  const [rows, setRows] = useState(getLegacy);
+  const [rows, setRows] = useState([]);
   const [view, setView] = useState("list");      // "list" | "detail"
   const [selId, setSelId] = useState(null);
   const [confirm, setConfirm] = useState(null);   // cliente a confirmar
   const [toast, setToast] = useState(null);       // { tone, msg }
   const sel = rows.find(r=>r.id===selId);
 
-  // Re-sembrar desde los datos reales cuando llega Supabase (CG.refresh → "cg:data").
-  useEffect(()=>{
-    const h = ()=> setRows(getLegacy());
-    window.addEventListener("cg:data", h);
-    return ()=> window.removeEventListener("cg:data", h);
-  }, []);
+  // Cargar de Supabase al montar (capa async de cg-validacion-data.jsx → /api/validacion).
+  useEffect(()=>{ loadLegacy(setRows); }, []);
 
   const validar = (c) => {
     const hoy = new Date().toISOString().slice(0,10);
-    // Optimista: marcamos validado de inmediato; Supabase es la fuente de verdad al refrescar.
+    // Optimista: marcamos validado de inmediato; el RPC es la fuente de verdad al recargar.
     setRows(rs => rs.map(r => r.id===c.id
       ? { ...r, validado:true, validadoPor:"Gustavo", validadoAt:hoy, saldoActual:r.saldo }
       : r));
     setConfirm(null);
     setToast({ tone:"green", msg:`Saldo de ${c.nombre} validado y agregado a crédito` });
     setTimeout(()=>setToast(null), 3200);
-    // Persistir: crea/actualiza cuenta de crédito, siembra el saldo inicial y marca validado.
-    if (c.customerId && window.CG && window.CG.write) {
-      window.CG.write("legacy.validate", {
-        customerId: c.customerId, creditLimit: c.limite, termsDays: c.dias,
-        saldo: c.saldo, validatedBy: "Gustavo",
-      }).then(function(r){
-        if (r && r.ok) { if (window.CG.refresh) window.CG.refresh(); }
+    // Persistir vía RPC validar_saldo_legacy (crea cuenta + siembra saldo, atómico en BD).
+    if (c.customerId && window.CG && window.CG.validacion && window.CG.validacion.validate) {
+      window.CG.validacion.validate(c.customerId, "Gustavo").then(function(r){
+        if (r && r.ok) loadLegacy(setRows);
         else if (r && r.error) setToast({ tone:"red", msg:`No se pudo validar: ${r.error}` });
       });
     }
