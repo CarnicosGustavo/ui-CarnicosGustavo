@@ -31,7 +31,7 @@ const FILES = [
 	"cg-recetas",
 	"cg-config",
 	"cg-designsystem",
-	"cg-notifs", "cg-pin",
+	"cg-notifs", "cg-pin", "cg-feedback",
 	"cg-app",
 ];
 
