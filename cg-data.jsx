@@ -543,3 +543,14 @@ CG.refresh = function () {
     .catch(function () { /* sin conexión: se conservan los mock */ });
 };
 if (typeof window !== "undefined" && typeof window.fetch === "function") CG.refresh();
+
+// Escritura: POST /api/write { op, ...params }. Devuelve {ok,...} o {error}.
+CG.write = function (op, params) {
+  return fetch("/api/write", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(Object.assign({ op: op }, params || {})),
+  })
+    .then(function (r) { return r.json(); })
+    .catch(function () { return { error: "sin conexión" }; });
+};

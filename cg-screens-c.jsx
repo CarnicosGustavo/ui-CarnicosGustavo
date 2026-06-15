@@ -224,7 +224,10 @@ function ClientesScreen({ ai }) {
                         { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("cobranza") },
                         { sep:true },
                         { label:"Eliminar", icon:"trash-2", danger:true,
-                          onClick:()=>setExtra(arr=>arr.filter(x=>x.id!==c.id)) },
+                          onClick:()=>{ if(!window.confirm(`¿Eliminar a ${c.nombre}?`)) return;
+                            setExtra(arr=>arr.filter(x=>x.id!==c.id));
+                            if (window.CG.write) window.CG.write("customer.delete", { id:c.id })
+                              .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); } },
                       ]} />
                     </div>
                   </td>
@@ -235,10 +238,21 @@ function ClientesScreen({ ai }) {
         </div>
       </Card>
       <NuevoClienteModal open={nuevo} onClose={()=>setNuevo(false)}
-        onCreate={(c)=>{ const id = 100 + extra.length;
-          setExtra(arr => [{ id, nombre:c.nombre, tel:c.tel, saldo:0, estado:"Activo", pedidos:0, gastado:0 }, ...arr]); }} />
+        onCreate={(f)=>{ const id = 100 + extra.length;
+          setExtra(arr => [{ id, nombre:f.nombre, tel:f.tel, saldo:0, estado:"Activo", pedidos:0, gastado:0 }, ...arr]);
+          if (window.CG.write) window.CG.write("customer.create", {
+            name:f.nombre, contact_name:f.contacto||null, phone:f.tel||null, whatsapp_phone:f.tel||null,
+            address:f.dir||null, notes:f.notas||null,
+            credit_limit:(f.tipo==="credito" && f.limite) ? Number(f.limite) : undefined,
+          }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+        }} />
       <EditarClienteModal open={!!editC} cliente={editC} onClose={()=>setEditC(null)}
-        onSave={()=>setEditC(null)} />
+        onSave={(u)=>{
+          if (editC && editC.id && window.CG.write) window.CG.write("customer.update", {
+            id:editC.id, name:u.nombre, phone:u.tel, address:u.dir,
+          }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+          setEditC(null);
+        }} />
     </div>
   );
 }
@@ -294,9 +308,9 @@ function CobranzaScreen({ ai }) {
                     <td style={{ padding:"13px 14px" }}>
                       <div style={{ display:"flex", gap:7, justifyContent:"center", alignItems:"center" }}>
                         <Btn kind="green" size="sm" icon="banknote"
-                          onClick={()=>setAbono({ nombre:c.cliente, saldo:c.saldo })}>Abonar</Btn>
+                          onClick={()=>setAbono({ id:c.id, nombre:c.cliente, saldo:c.saldo })}>Abonar</Btn>
                         <Kebab items={[
-                          { label:"Registrar abono", icon:"banknote", onClick:()=>setAbono({ nombre:c.cliente, saldo:c.saldo }) },
+                          { label:"Registrar abono", icon:"banknote", onClick:()=>setAbono({ id:c.id, nombre:c.cliente, saldo:c.saldo }) },
                           { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("pedidos") },
                           { label:"Recordatorio WhatsApp", icon:"message-circle", onClick:()=>waRecordatorio(c) },
                           { label:"Ver pedidos a crédito", icon:"receipt-text", onClick:()=>goTo("pedidos") },
@@ -311,7 +325,13 @@ function CobranzaScreen({ ai }) {
         </div>
       </Card>
       <AbonarModal open={!!abono} cliente={abono} onClose={()=>setAbono(null)}
-        onAbono={()=>setAbono(null)} />
+        onAbono={(a)=>{
+          if (abono && abono.id && window.CG.write) {
+            window.CG.write("abono", { customerId:abono.id, amount:a.monto, method:a.metodo, notes:a.nota })
+              .then(function(r){ if (r && r.ok && window.CG.refresh) window.CG.refresh(); });
+          }
+          setAbono(null);
+        }} />
     </div>
   );
 }

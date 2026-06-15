@@ -151,7 +151,7 @@ export default async function handler(req, res) {
 			}));
 			out.ops.cobranza = out.ops.clientes
 				.filter((c) => c.saldo > 0.005)
-				.map((c) => ({ cliente: c.nombre, cargos: chMap.get(c.id) || 0, abonos: paMap.get(c.id) || 0, saldo: c.saldo, dias: 0 }))
+				.map((c) => ({ id: c.id, cliente: c.nombre, cargos: chMap.get(c.id) || 0, abonos: paMap.get(c.id) || 0, saldo: c.saldo, dias: 0 }))
 				.sort((a, b) => b.saldo - a.saldo);
 		}
 	} catch (e) { console.error("cobranza", e?.message); }

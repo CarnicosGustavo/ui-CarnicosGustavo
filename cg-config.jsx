@@ -274,6 +274,10 @@ function CajaScreen({ ai }) {
     if (!desc.trim() || !(parseFloat(imp)>0)) return;
     const hoy = new Date().toLocaleDateString("es-MX",{ day:"2-digit", month:"2-digit" });
     setTxs(t=>[{ desc, cat:cat||"General", tipo, fecha:hoy, importe:parseFloat(imp) }, ...t]);
+    if (window.CG.write) window.CG.write("tx.create", {
+      description: desc, amount: Math.round(parseFloat(imp) * 100), // centavos
+      type: tipo === "Ingreso" ? "income" : "expense", category: cat || null,
+    });
     setDesc(""); setCat(""); setImp("");
   };
   return (
