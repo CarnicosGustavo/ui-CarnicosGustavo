@@ -18,7 +18,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Compra del día
 - ✅ Lectura (proveedores, totales) · ✅ agregar/limpiar proveedores (local)
-- ⏳ **Guardar compra del día** no persiste → `yields.savePurchases`
+- ✅ **Guardar compra del día** persiste → `purchases.save` (sin re-sync de stock, a validar)
 - 🔧 celdas de la tabla no son editables individualmente (solo display)
 
 ## Pedidos (lista + detalle)
@@ -53,7 +53,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Clientes (lista + detalle)
 - ✅ **Crear / Editar / Eliminar** persisten → `customer.*`
-- 🔧 "Nuevo pedido" → POS sin precargar cliente
+- ✅ "Nuevo pedido" → POS **precargando** el cliente
 - 🔧 "Estado de cuenta" → Cobranza sin filtrar
 - ⏳ Ficha 360° (detalle) no existe
 
@@ -76,8 +76,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ⏳ **Guardar** no persiste → `prices.bulkUpsert` (falta `customerId` + `productId`)
 
 ## Inventario Frío
-- ✅ **A frío / A fresco** persisten → `cold.toFrozen/toFresh`
-- 🔧 transfiere TODO el stock (no pide kg/piezas)
+- ✅ **A frío / A fresco** con **diálogo de kg/piezas** → `cold.toFrozen/toFresh`
 
 ## Caja
 - ✅ **Agregar** persiste → `tx.create`
