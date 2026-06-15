@@ -25,7 +25,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ **Crear pedido** (modal) persiste → `order.create`
 - ✅ CSV / imprimir / ordenar / duplicar (local)
 - 🔧 **Ver detalle / Editar** solo imprime/abre modal vacío → falta detalle real
-- ⏳ Cancelar / Eliminar / Editar **no persisten** → `orders.update/delete`
+- ✅ Cancelar (→cancelled) / Eliminar persisten → `order.update/delete` · ⏳ Editar (replaceItems)
 - 🔧 WhatsApp sin teléfono del cliente (texto genérico)
 
 ## Despiece
@@ -79,8 +79,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ **A frío / A fresco** con **diálogo de kg/piezas** → `cold.toFrozen/toFresh`
 
 ## Caja
-- ✅ **Agregar** persiste → `tx.create`
-- ⏳ editar/eliminar no persisten · lectura (`transactions.list`) no mapeada en `/api/cg-data`
+- ✅ **Agregar** + **Eliminar** persisten · ✅ lee transacciones reales (`config.caja`) · ⏳ editar
 
 ## Métodos de pago
 - ✅ **Crear / Editar / Eliminar** persisten → `payment.*`
