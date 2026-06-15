@@ -321,5 +321,64 @@ export default async function handler(req, res) {
 		}
 	} catch (e) { console.error("ops.rendimiento", e?.message); }
 
+	// ---------- recetas (product_transformations → CG.recetas) ----------
+	// Reproduce la forma exacta de CG.recetas del prototipo:
+	//   { styles:[{ type, parent, canalW, kind, accent, pid, rows:[{ n,cat,pz,pct,variant?,pid,tid,kids[] }] }], palette }
+	// pct = yield_weight_ratio*100 (relativo al padre inmediato, igual que M1).
+	// Embebemos pid (product_id) y tid (transformation id) para poder PERSISTIR
+	// cambios por receta (recipe.*) sin tocar el diseño (claves extra ignoradas al render).
+	try {
+		const prodById = new Map(products.map((p) => [p.id, p]));
+		const { data: trAll } = await db.from("product_transformations")
+			.select("id, parent_product_id, child_product_id, yield_quantity_pieces, yield_weight_ratio, transformation_type, is_variant")
+			.eq("is_active", true);
+		const trs = trAll || [];
+		if (trs.length) {
+			const byParent = new Map();
+			const childIds = new Set();
+			for (const t of trs) {
+				const arr = byParent.get(t.parent_product_id) || [];
+				arr.push(t); byParent.set(t.parent_product_id, arr);
+				childIds.add(t.child_product_id);
+			}
+			// Canales = padres que NO son hijos de nadie (raíz del árbol de despiece).
+			const rootIds = [...byParent.keys()].filter((pid) => !childIds.has(pid));
+			const ACCENT = {
+				AMERICANO: "hsl(12 70% 52%)",
+				NACIONAL_LOMO: "hsl(173 58% 33%)",
+				NACIONAL_ESPILOMO: "hsl(199 65% 36%)",
+				POLINESIO: "hsl(28 80% 48%)",
+			};
+			const FALLBACK = ["hsl(12 70% 52%)", "hsl(173 58% 33%)", "hsl(199 65% 36%)", "hsl(28 80% 48%)", "hsl(280 50% 50%)"];
+			const buildRows = (parentId, path) => (byParent.get(parentId) || []).map((t) => {
+				const child = prodById.get(t.child_product_id) || {};
+				const node = {
+					n: child.name || `#${t.child_product_id}`,
+					cat: child.category || "Otros",
+					pz: num(t.yield_quantity_pieces),
+					pct: +(num(t.yield_weight_ratio) * 100).toFixed(2),
+					pid: t.child_product_id, tid: t.id,
+				};
+				if (t.is_variant) node.variant = true;
+				if (byParent.has(t.child_product_id) && !path.has(t.child_product_id))
+					node.kids = buildRows(t.child_product_id, new Set([...path, t.child_product_id]));
+				return node;
+			});
+			let aIdx = 0;
+			const styles = rootIds.map((rootId) => {
+				const canal = prodById.get(rootId) || {};
+				const rows = buildRows(rootId, new Set([rootId]));
+				const type = (byParent.get(rootId)[0] || {}).transformation_type || (canal.name || `CANAL_${rootId}`).toUpperCase();
+				const canalW = num(canal.avg_weight_per_piece_kg) || (num(canal.stock_pieces) ? num(canal.stock_kg) / num(canal.stock_pieces) : 105);
+				const accent = ACCENT[type] || FALLBACK[aIdx++ % FALLBACK.length];
+				return { type, parent: canal.name || `Canal #${rootId}`, canalW, kind: canalW > 80 ? "completo" : "media", accent, pid: rootId, rows };
+			}).filter((s) => s.rows.length);
+			// palette: productos reales agrupados por categoría (fuente de arrastre).
+			const palette = {};
+			for (const p of products) { const cat = p.category || "Otros"; (palette[cat] = palette[cat] || []).push(p.name); }
+			if (styles.length) out.recetas = { styles, ...(Object.keys(palette).length ? { palette } : {}) };
+		}
+	} catch (e) { console.error("recetas", e?.message); }
+
 	return res.status(200).json(out);
 }
