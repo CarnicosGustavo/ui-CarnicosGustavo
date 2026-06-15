@@ -78,9 +78,10 @@ function ProductosScreen({ ai }) {
   const [prods, setProds] = useState(CFG.productos);
   const tipos = ["Todos","Canal de Cerdo","Pierna de Cerdo","Espilomo"];
   const view = prods.filter(p=> !q || p.n.toLowerCase().includes(q.toLowerCase()));
-  const addProd = ()=> setProds(a=>[{ n:"NUEVO PRODUCTO", tipo:"Hijo", rend:null, precio:0, stock:0 }, ...a]);
-  const editProd = (p)=>{ const n=window.prompt("Nombre del producto", p.n); if(n) setProds(a=>a.map(x=>x===p?{...x, n}:x)); };
-  const delProd = (p)=> setProds(a=>a.filter(x=>x!==p));
+  const W = (op,params)=> window.CG.write && window.CG.write(op,params).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+  const addProd = ()=>{ const n=window.prompt("Nombre del producto nuevo"); if(!n||!n.trim()) return; setProds(a=>[{ n:n.trim(), tipo:"Hijo", rend:null, precio:0, stock:0 }, ...a]); W("product.create",{name:n.trim()}); };
+  const editProd = (p)=>{ const n=window.prompt("Nombre del producto", p.n); if(n&&n.trim()){ setProds(a=>a.map(x=>x===p?{...x, n:n.trim()}:x)); if(p.id) W("product.update",{id:p.id, name:n.trim()}); } };
+  const delProd = (p)=>{ if(!window.confirm(`¿Eliminar ${p.n}?`)) return; setProds(a=>a.filter(x=>x!==p)); if(p.id) W("product.delete",{id:p.id}); };
   return (
     <div>
       <ScreenHead title="Productos" desc="Catálogo completo: piezas padre (se despiezan) e hijas (se venden). El % de rendimiento viene de las recetas."

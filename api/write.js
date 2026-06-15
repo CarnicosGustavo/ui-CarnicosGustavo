@@ -225,6 +225,37 @@ export default async function handler(req, res) {
 				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
 			}
 
+			// ---------- PRODUCTOS (catálogo) ----------
+			case "product.create": {
+				if (!p.name) return fail("name requerido");
+				const { data, error } = await db.from("products").insert({
+					name: p.name, category: p.category || null, user_uid: USER_UID,
+					is_parent_product: !!p.is_parent_product,
+					price_per_kg: p.price_per_kg != null ? Number(p.price_per_kg).toFixed(2) : null,
+					stock_pieces: p.stock_pieces != null ? Math.round(Number(p.stock_pieces)) : 0,
+				}).select("id").single();
+				if (error) throw error;
+				return ok({ id: data.id });
+			}
+			case "product.update": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.name !== undefined) patch.name = p.name;
+				if (p.category !== undefined) patch.category = p.category;
+				if (p.price_per_kg !== undefined) patch.price_per_kg = p.price_per_kg != null ? Number(p.price_per_kg).toFixed(2) : null;
+				if (p.stock_pieces !== undefined) patch.stock_pieces = Math.round(Number(p.stock_pieces));
+				if (p.is_parent_product !== undefined) patch.is_parent_product = !!p.is_parent_product;
+				const { error } = await db.from("products").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "product.delete": {
+				if (!p.id) return fail("id requerido");
+				const { error } = await db.from("products").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+
 			// ---------- BÁSCULA: registrar peso de un artículo ----------
 			case "order.weighItem": {
 				if (!p.orderItemId || !(Number(p.kg) > 0)) return fail("orderItemId y kg>0 requeridos");

@@ -65,6 +65,7 @@ export default async function handler(req, res) {
 	// ---------- config.productos ----------
 	try {
 		if (products.length) out.config.productos = products.map((p) => ({
+			id: p.id,
 			n: p.name,
 			tipo: p.is_parent_product ? "Padre" : "Hijo",
 			rend: null,

@@ -270,6 +270,7 @@ function ClientesScreen({ ai }) {
 function CobranzaScreen({ ai }) {
   const [abono, setAbono] = useState(null);   // cliente {nombre,saldo} o null
   const [estado, setEstado] = useState(null); // estado de cuenta de un cliente
+  const [cargo, setCargo] = useState(null);   // captura de ticket viejo o null
   const goTo = (m)=> window.__cgGo && window.__cgGo(m);
   const waRecordatorio = (c)=> window.open(
     "https://wa.me/?text=" + encodeURIComponent(
@@ -281,7 +282,7 @@ function CobranzaScreen({ ai }) {
   return (
     <div>
       <ScreenHead title="Cobranza" desc="Cuentas por cobrar: pedidos a crédito y tickets viejos. Registra abonos y manda recordatorios."
-        right={<Btn kind="outline" icon="plus">Capturar ticket viejo</Btn>} />
+        right={<Btn kind="outline" icon="plus" onClick={()=>setCargo({ clienteId:"", monto:"", concepto:"" })}>Capturar ticket viejo</Btn>} />
       <SlotC id="cobranza" ai={ai} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:14, marginBottom:16 }}>
         <Card pad={18} style={{ background:Cx.redWash, borderColor:"transparent" }}>
@@ -360,6 +361,34 @@ function CobranzaScreen({ ai }) {
             <div style={{ marginTop:10, font:`500 11.5px/1.4 ${Fx.ui}`, color:Cx.inkFaint }}>
               Antigüedad del saldo: {estado.dias} días.
             </div>
+          </div>
+        )}
+      </Modal>
+      <Modal open={!!cargo} onClose={()=>setCargo(null)} icon="plus" title="Capturar ticket viejo" width={460}
+        subtitle="Registra un cargo a crédito de un cliente (deuda previa)."
+        footer={<>
+          <Btn kind="outline" onClick={()=>setCargo(null)}>Cancelar</Btn>
+          <Btn kind="green" icon="check" onClick={()=>{
+            if (cargo && cargo.clienteId && parseFloat(cargo.monto)>0 && window.CG.write) {
+              window.CG.write("cargo", { customerId:Number(cargo.clienteId), amount:parseFloat(cargo.monto), concept:cargo.concepto||"Ticket viejo" })
+                .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+            }
+            setCargo(null);
+          }}>Guardar cargo</Btn>
+        </>}>
+        {cargo && (
+          <div style={{ display:"grid", gap:11 }}>
+            <select value={cargo.clienteId} onChange={e=>setCargo({ ...cargo, clienteId:e.target.value })}
+              style={{ font:`600 14px/1 ${Fx.ui}`, color:Cx.ink, background:Cx.paper2, border:`1px solid ${Cx.line}`, borderRadius:10, padding:"12px 13px", outline:"none" }}>
+              <option value="">Selecciona cliente…</option>
+              {(window.CG.ops.clientes||[]).map(c=> <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+            <input placeholder="Monto $" type="number" inputMode="decimal" value={cargo.monto}
+              onChange={e=>setCargo({ ...cargo, monto:e.target.value })}
+              style={{ font:`600 14px/1 ${Fx.mono}`, color:Cx.ink, background:Cx.paper2, border:`1px solid ${Cx.line}`, borderRadius:10, padding:"12px 13px", outline:"none" }} />
+            <input placeholder="Concepto (opcional)" value={cargo.concepto}
+              onChange={e=>setCargo({ ...cargo, concepto:e.target.value })}
+              style={{ font:`500 14px/1 ${Fx.ui}`, color:Cx.ink, background:Cx.paper2, border:`1px solid ${Cx.line}`, borderRadius:10, padding:"12px 13px", outline:"none" }} />
           </div>
         )}
       </Modal>
