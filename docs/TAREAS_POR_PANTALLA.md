@@ -45,8 +45,16 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - 🔧 UI single-line (1 precio); pedidos multi-línea aplican el mismo input al 1º
 
 ## Rendimiento
-- ✅ Proyectar/Guardar/Calibrar (local + nav)
-- ⏳ no persisten → `yields.create` / `projectFromCanales` / `calibrateFromDay`
+- ✅ Proyectar piezas (local)
+- ✅ **Guardar hoja** persiste → `yield.save` (yield_sheets + items, kg en kilos)
+- ✅ **Calibrar recetas** persiste → `yield.calibrate` (recalcula yield_weight_ratio con
+  pesos reales COMPLETADO del día; raíz=kg/canalTotal, sub=kg/padre) · con confirm + test
+
+## CEDIS (módulo nuevo de diseño)
+- ✅ ops backend listas: `cedis.addSupplier`, `cedis.save` (verified_*/cedis_detail),
+  `purchase.recordSupplier` (stock + COMPRA)
+- ⏳ **cableado de pantalla** `cg-cedis.jsx` pendiente: necesita leer `channel_purchases`
+  del día con ids reales para mapear proveedores↔filas y persistir (hoy usa estado local)
 
 ## Cobranza
 - ✅ **Abonar** persiste → `abono` · ✅ **Estado de cuenta** (modal) · ✅ WhatsApp

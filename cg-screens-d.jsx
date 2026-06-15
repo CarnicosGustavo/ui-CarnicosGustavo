@@ -23,6 +23,20 @@ function RendimientoScreen({ ai }) {
   const [showCal, setShowCal] = useState(true);
   const goTo = (m)=> window.__cgGo && window.__cgGo(m);
   const proyectar = ()=> setReales(r.piezas.map(p=>p.est));
+  const guardarHoja = ()=>{
+    if (window.CG.write) {
+      window.CG.write("yield.save", {
+        numCanales:r.canales, kgComprado:r.kgComprado, supplier:r.proveedor,
+        items:r.piezas.map((p,i)=>({ productName:p.n, pieces:p.pz, kgTotal:(+reales[i]||0), weighed:(+reales[i]||0)>0, sortOrder:i })),
+      }).then(function(rr){ if(rr&&rr.ok&&window.CG.refresh) window.CG.refresh(); });
+    }
+    goTo("panel");
+  };
+  const calibrar = ()=>{
+    if (!window.confirm("¿Recalibrar los % de TODAS las recetas con los pesos reales capturados hoy? Esta acción modifica las recetas.")) return;
+    if (window.CG.write) window.CG.write("yield.calibrate", {}).then(function(rr){ if(rr&&rr.ok&&window.CG.refresh) window.CG.refresh(); });
+    goTo("recetas");
+  };
 
   const totEst = r.piezas.reduce((s,p)=>s+p.est,0);
   const totReal = reales.reduce((s,v)=>s+(+v||0),0);
@@ -32,7 +46,7 @@ function RendimientoScreen({ ai }) {
   return (
     <div>
       <ScreenHead title="Rendimiento de Despiece" desc="Captura el peso real de cada pieza y compáralo con el estimado para medir el rendimiento del día y calibrar recetas."
-        right={<><Btn kind="outline" icon="sparkles" onClick={proyectar}>Proyectar piezas</Btn><Btn kind="dark" icon="save" onClick={()=>goTo("panel")}>Guardar hoja</Btn></>} />
+        right={<><Btn kind="outline" icon="sparkles" onClick={proyectar}>Proyectar piezas</Btn><Btn kind="dark" icon="save" onClick={guardarHoja}>Guardar hoja</Btn></>} />
       <Slot id="rendimiento" ai={ai} />
 
       <div style={{ display:"grid", gridTemplateColumns:"260px 1fr", gap:14, alignItems:"start" }} className="cg-two-col">
@@ -54,7 +68,7 @@ function RendimientoScreen({ ai }) {
           {showCal && (
             <AiSuggestBar tone="sugerencia" title="Calibrar recetas con el día"
               text={`Con estos pesos reales el americano rinde ${rend.toFixed(1)}%. Puedo recalibrar los % de las recetas para afinar las próximas estimaciones.`}
-              primary="Calibrar recetas" onPrimary={()=>goTo("recetas")} secondary="Ahora no" onSecondary={()=>setShowCal(false)} />
+              primary="Calibrar recetas" onPrimary={calibrar} secondary="Ahora no" onSecondary={()=>setShowCal(false)} />
           )}
         </div>
 

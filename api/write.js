@@ -102,6 +102,40 @@ async function toVariant(db, args) {
 	return { baseProductId: args.baseProductId, variantProductId: args.variantProductId, pieces };
 }
 
+// === Fase 3: rendimiento / calibración (réplica de yields.calibrateFromDay de M1) ===
+// Recalcula product_transformations.yield_weight_ratio con pesos REALES del día.
+// En ui-CG las piezas pesadas quedan en order_items.status="COMPLETADO" y
+// quantity_kg está en GRAMOS (kg×1000). Raíz: ratio = kgPieza/kgCanalTotal;
+// sub-pieza: ratio = kgPieza/kgPadre. Solo toca piezas con peso ese día.
+async function calibrateYields(db, date) {
+	const { data: buys } = await db.from("channel_purchases").select("total_kg, verified_kg, purchase_date").eq("purchase_date", date);
+	const totalCanalKg = (buys || []).reduce((a, b) => a + (b.verified_kg != null ? Number(b.verified_kg) : Number(b.total_kg) || 0), 0);
+	if (!(totalCanalKg > 0)) return { error: "sin compra de canales para esa fecha" };
+	const { data: ords } = await db.from("orders").select("id, created_at");
+	const dayOids = (ords || []).filter((o) => (o.created_at || "").slice(0, 10) === date).map((o) => o.id);
+	const realW = new Map();
+	if (dayOids.length) {
+		const { data: ois } = await db.from("order_items").select("product_id, quantity_kg, status").in("order_id", dayOids);
+		for (const it of ois || []) if (it.product_id != null && it.status === "COMPLETADO")
+			realW.set(it.product_id, (realW.get(it.product_id) || 0) + Number(it.quantity_kg || 0) / 1000);
+	}
+	if (realW.size === 0) return { error: "no hay piezas pesadas (COMPLETADO) ese día" };
+	const { data: txns } = await db.from("product_transformations").select("id, parent_product_id, child_product_id").eq("is_active", true);
+	const childIds = new Set((txns || []).map((t) => t.child_product_id));
+	const isRoot = (pid) => !childIds.has(pid);
+	let updated = 0;
+	for (const t of txns || []) {
+		const childKg = realW.get(t.child_product_id);
+		if (!childKg || childKg <= 0) continue;
+		let newRatio;
+		if (isRoot(t.parent_product_id)) newRatio = childKg / totalCanalKg;
+		else { const parentKg = realW.get(t.parent_product_id); if (!parentKg || parentKg <= 0) continue; newRatio = childKg / parentKg; }
+		await db.from("product_transformations").update({ yield_weight_ratio: newRatio.toFixed(4) }).eq("id", t.id);
+		updated++;
+	}
+	return { updated, totalCanalKg: +totalCanalKg.toFixed(3), piezasPesadas: realW.size };
+}
+
 // === Fase 0: integridad de inventario (réplica de la lógica de M1) ===
 
 // Descuenta inventario por una venta. Por cada order_item con product_id baja
@@ -541,6 +575,83 @@ export default async function handler(req, res) {
 				return ok({ productId: p.productId, category });
 			}
 
+			// ---------- RENDIMIENTO / YIELDS ----------
+			case "yield.save": {
+				// Inserta una hoja de rendimiento + sus piezas (kg en KILOS, no gramos).
+				const { data: sheet, error: e1 } = await db.from("yield_sheets").insert({
+					sheet_date: p.sheetDate || today(),
+					num_canales: Math.round(Number(p.numCanales) || 0),
+					kg_comprado: Number(p.kgComprado || 0).toFixed(3),
+					supplier: p.supplier || null, notes: p.notes || null, user_uid: USER_UID,
+				}).select("id").single();
+				if (e1) throw e1;
+				const items = Array.isArray(p.items) ? p.items : [];
+				if (items.length) {
+					const rows = items.map((it, i) => ({
+						sheet_id: sheet.id, product_id: it.productId ?? null,
+						product_name: it.productName || "—", pieces: Math.round(Number(it.pieces) || 0),
+						kg_total: Number(it.kgTotal || 0).toFixed(3), weighed: !!it.weighed, sort_order: it.sortOrder ?? i,
+					}));
+					const { error: e2 } = await db.from("yield_sheet_items").insert(rows);
+					if (e2) throw e2;
+				}
+				return ok({ id: sheet.id });
+			}
+			case "yield.calibrate": {
+				const r = await calibrateYields(db, p.date || today());
+				if (r.error) return fail(r.error);
+				return ok(r);
+			}
+
+			// ---------- CEDIS (verificación de canales recibidos) ----------
+			case "cedis.addSupplier": {
+				const { data, error } = await db.from("channel_purchases").insert({
+					supplier: p.supplier || "Proveedor", purchase_date: p.date || today(), user_uid: USER_UID,
+				}).select("id").single();
+				if (error) throw error;
+				return ok({ id: data.id });
+			}
+			case "cedis.save": {
+				if (!Array.isArray(p.rows)) return fail("rows[] requerido");
+				let count = 0;
+				for (const r of p.rows) {
+					if (!r.id) continue;
+					const mode = r.mode === "total" ? "total" : "canal";
+					const verifCanales = mode === "total" ? Math.round(Number(r.totalCanales) || 0) : (r.weights || []).length;
+					const verifKg = mode === "total" ? Number(r.totalKg || 0) : (r.weights || []).reduce((a, b) => a + (Number(b) || 0), 0);
+					await db.from("channel_purchases").update({
+						verified_canales: verifCanales > 0 ? verifCanales : null,
+						verified_kg: verifKg > 0 ? verifKg.toFixed(3) : null,
+						cedis_detail: { mode, tara: Number(r.tara) || 0, weights: r.weights || [], totalKg: Number(r.totalKg) || 0, totalCanales: Math.round(Number(r.totalCanales) || 0) },
+					}).eq("id", r.id);
+					count++;
+				}
+				return ok({ count });
+			}
+
+			// ---------- COMPRA A PROVEEDOR (productos directos; NO idempotente) ----------
+			case "purchase.recordSupplier": {
+				const items = (Array.isArray(p.items) ? p.items : []).filter((it) => Number(it.pieces) > 0 || Number(it.kg) > 0);
+				if (!items.length) return ok({ count: 0 });
+				let count = 0;
+				for (const it of items) {
+					const { data: prod } = await db.from("products").select("stock_pieces, stock_kg").eq("id", it.productId).single();
+					if (!prod) continue;
+					await db.from("products").update({
+						stock_pieces: Number(prod.stock_pieces || 0) + Math.round(Number(it.pieces) || 0),
+						stock_kg: (Number(prod.stock_kg || 0) + Number(it.kg || 0)).toFixed(3),
+					}).eq("id", it.productId);
+					await db.from("inventory_transactions").insert({
+						product_id: it.productId, quantity_change_pieces: Math.round(Number(it.pieces) || 0) || null,
+						quantity_change_kg: Number(it.kg) > 0 ? Number(it.kg).toFixed(3) : null,
+						transaction_type: "COMPRA", reference_id: null,
+						notes: `Compra a proveedor${p.supplier ? ` ${p.supplier}` : ""} (${p.date || today()})${it.pricePerKg ? ` · $${it.pricePerKg}/kg` : ""}`,
+					});
+					count++;
+				}
+				return ok({ count });
+			}
+
 			// ---------- COMPRA DEL DÍA (channel_purchases) ----------
 			// Reemplaza las compras de HOY del usuario y RE-SINCRONIZA el stock de
 			// canales (comprado − despiezado), idéntico a M1. Idempotente.
@@ -663,4 +774,4 @@ export default async function handler(req, res) {
 	}
 }
 
-export { deductInventoryForOrder, syncCanalStock, disassemble, toVariant };
+export { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields };

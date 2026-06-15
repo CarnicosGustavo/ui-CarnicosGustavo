@@ -1,5 +1,5 @@
 // Pruebas de la lógica de api/write.js con un mock en memoria de supabase-js.
-import { deductInventoryForOrder, syncCanalStock, disassemble, toVariant } from "../api/write.js";
+import { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields } from "../api/write.js";
 
 function makeDb(store, log){
   function matches(row, filters){
@@ -81,6 +81,27 @@ const A=(c,m)=>{ if(!c){ console.error("✗ "+m); fails++; } else console.log("�
     await toVariant(makeDb(store,[]),{baseProductId:400,variantProductId:401,pieces:3});
     A(store.products[0].stock_pieces===7 && store.products[0].stock_kg==="63.000", "variante: base 10-3=7 / 90-27=63kg");
     A(store.products[1].stock_pieces===3 && store.products[1].stock_kg==="24.300", "variante: variante 3pz / 27*0.9=24.3kg");
+  }
+  // ---- calibrateYields: raíz=kg/canalTotal, sub=kg/padre, ignora no-pesados ----
+  {
+    const store={
+      channel_purchases:[{id:1,purchase_date:"2026-06-15",total_kg:200,verified_kg:null}],
+      orders:[{id:50,created_at:"2026-06-15T10:00:00"},{id:51,created_at:"2026-06-14T10:00:00"}],
+      order_items:[
+        {order_id:50,product_id:10,quantity_kg:100000,status:"COMPLETADO"},  // 100kg raíz
+        {order_id:50,product_id:20,quantity_kg:80000,status:"COMPLETADO"},   // 80kg sub de 10
+        {order_id:50,product_id:30,quantity_kg:50000,status:"PENDIENTE_PESAJE"}, // ignorado
+        {order_id:51,product_id:10,quantity_kg:999000,status:"COMPLETADO"}],  // otro día: ignorado
+      product_transformations:[
+        {id:1,parent_product_id:1,child_product_id:10,is_active:true,yield_weight_ratio:0.1},
+        {id:2,parent_product_id:10,child_product_id:20,is_active:true,yield_weight_ratio:0.1},
+        {id:3,parent_product_id:1,child_product_id:30,is_active:true,yield_weight_ratio:0.1}] };
+    const r=await calibrateYields(makeDb(store,[]),"2026-06-15");
+    const T=(id)=>store.product_transformations.find(x=>x.id===id);
+    A(T(1).yield_weight_ratio==="0.5000","calibrate: raíz 100/200=0.5000");
+    A(T(2).yield_weight_ratio==="0.8000","calibrate: sub 80/100=0.8000");
+    A(T(3).yield_weight_ratio===0.1,"calibrate: pieza sin pesar NO cambia");
+    A(r.updated===2 && r.piezasPesadas===2 && r.totalCanalKg===200,"calibrate: updated=2, pesadas=2, canalKg=200");
   }
   console.log(fails?`\n❌ ${fails} FALLO(S)`:"\n✅ TODOS LOS TESTS PASARON");
   process.exitCode = fails?1:0;
