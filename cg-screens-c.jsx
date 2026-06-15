@@ -135,10 +135,10 @@ function PedidosScreen({ ai }) {
     { label:"Duplicar", icon:"copy", onClick:()=>setExtra(arr=>[{ ...p, id:360+arr.length }, ...arr]) },
     { label:"Enviar por WhatsApp", icon:"message-circle", onClick:()=>waOpen("", `Pedido #${p.id} de ${p.cliente}`) },
     { sep:true },
-    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>{ setOver(o=>({ ...o, [p.id]:{ estado:"Cancelada" } }));
-      if(window.CG.write) window.CG.write("order.update",{ id:p.id, status:"cancelled" }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); } }] : []),
-    { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>{ if(!window.confirm(`¿Eliminar el pedido #${p.id}?`)) return; setHidden(h=>[...h, p.id]);
-      if(window.CG.write) window.CG.write("order.delete",{ id:p.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); } },
+    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>window.CG.requireAuth(()=>{ setOver(o=>({ ...o, [p.id]:{ estado:"Cancelada" } }));
+      if(window.CG.write) window.CG.write("order.update",{ id:p.id, status:"cancelled" }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); }, `¿Cancelar el pedido #${p.id}? Autoriza con tu PIN.`) }] : []),
+    { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>window.CG.requireAuth(()=>{ setHidden(h=>[...h, p.id]);
+      if(window.CG.write) window.CG.write("order.delete",{ id:p.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); }, `¿Eliminar el pedido #${p.id}? Acción no reversible — autoriza con tu PIN.`) },
   ];
 
   return (
@@ -285,10 +285,10 @@ function ClientesScreen({ ai }) {
                         { label:"Estado de cuenta", icon:"file-text", onClick:()=>{ window.CG._fichaId = c.id; goTo("ficha"); } },
                         { sep:true },
                         { label:"Eliminar", icon:"trash-2", danger:true,
-                          onClick:()=>{ if(!window.confirm(`¿Eliminar a ${c.nombre}?`)) return;
+                          onClick:()=>window.CG.requireAuth(()=>{
                             setExtra(arr=>arr.filter(x=>x.id!==c.id));
                             if (window.CG.write) window.CG.write("customer.delete", { id:c.id })
-                              .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); } },
+                              .then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); }, `¿Eliminar a ${c.nombre}? Acción no reversible — autoriza con tu PIN.`) },
                       ]} />
                     </div>
                   </td>

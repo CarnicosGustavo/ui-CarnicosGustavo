@@ -16,10 +16,23 @@ function AntonellaSlot({ data, onChip, onOpen, onNav }) {
   const [open, setOpen] = useState(true);
   if (!data) return null;
   const t = TONE[data.tone] || TONE.sugerencia;
-  const runAction = (a) => {
+  const doAction = (a) => {
+    // Acción que ejecuta una op de escritura (Antonella puede operar el sistema).
+    if (typeof a === "object" && a.op && window.CG.write) {
+      window.CG.write(a.op, a.params || {}).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
+      return;
+    }
     if (typeof a === "object" && a.go) { onNav ? onNav(a.go) : (window.__cgGo && window.__cgGo(a.go)); return; }
     const label = typeof a === "object" ? (a.ask || a.label) : a;
     onChip && onChip(label);
+  };
+  const runAction = (a) => {
+    // Si la acción es sensible (a.auth), Antonella pide el PIN de autorización primero.
+    if (typeof a === "object" && a.auth && window.CG.requireAuth) {
+      window.CG.requireAuth(()=>doAction(a), a.authMsg || `Autoriza "${a.label||"esta acción"}" con tu PIN.`);
+      return;
+    }
+    doAction(a);
   };
   return (
     <div style={{ position:"relative", borderRadius:18, marginBottom:18,
@@ -272,8 +285,10 @@ function AntonellaDock({ moduleId, pending, open, setOpen, seed, onSeedConsumed 
                   {ctxData.actions.map((a,i)=>{
                     const label = typeof a==="object"?a.label:a;
                     const ic = typeof a==="object"?a.icon:(i===0?"sparkles":null);
-                    const run = ()=>{ if(typeof a==="object" && a.go){ setCtx(null); setOpen(false); window.__cgGo && window.__cgGo(a.go); }
+                    const exec = ()=>{ if(typeof a==="object" && a.op && window.CG.write){ setCtx(null); window.CG.write(a.op, a.params||{}).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); }
+                      else if(typeof a==="object" && a.go){ setCtx(null); setOpen(false); window.__cgGo && window.__cgGo(a.go); }
                       else { setCtx(null); send(typeof a==="object"?(a.ask||a.label):a); } };
+                    const run = ()=>{ if(typeof a==="object" && a.auth && window.CG.requireAuth) window.CG.requireAuth(exec, a.authMsg || `Autoriza "${a.label||"esta acción"}" con tu PIN.`); else exec(); };
                     return (
                     <button key={i} onClick={run} style={{ font:`700 11.5px/1 ${Fn.ui}`,
                       color: i===0?Cn.chromeFg:Cn.ink, background:i===0?Cn.chrome:"transparent",

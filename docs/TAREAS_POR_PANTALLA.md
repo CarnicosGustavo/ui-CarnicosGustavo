@@ -123,6 +123,11 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ **PINs configurables** en *Configuración › Seguridad y PINs* (privacidad / CEDIS / Frío),
   vía `CG.getPin/setPin/checkPin` + compuerta `CG.requirePin(kind, onOk)` (módulo `cg-pin.jsx`)
 - ✅ **montos del Panel ocultos por defecto**; "Mostrar montos" pide el PIN de privacidad
+- ✅ **PIN de autorización** (= el de privacidad) gatea acciones sensibles / no reversibles
+  vía `CG.requireAuth(onOk, msg)`: cancelar/eliminar pedido, eliminar cliente, eliminar
+  producto, eliminar movimiento de caja, recalibrar recetas y **resets** (además de la
+  contraseña admin). **Antonella** también lo pide: acciones con `a.auth`/`a.op` piden PIN
+  antes de ejecutar la op.
 - ⏳ auth con credenciales reales (backend) pendiente: hoy el PIN de privacidad es la puerta
 
 ---

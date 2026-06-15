@@ -53,13 +53,15 @@ function DangerCard({ tone, icon, title, desc, cta, op }) {
   const ready = pw.length>0 && conf.trim().toUpperCase()==="RESET";
   const ejecutar = ()=>{
     if(!ready) return;
-    if(op && window.CG.write){
-      window.CG.write(op, { adminPassword:pw, confirm:"RESET" }).then(function(r){
-        if(r && r.ok){ if(window.CG.refresh) window.CG.refresh(); }
-        else if(r && r.error){ window.alert("No se pudo: "+r.error); }
-      });
-    }
-    setDone(true); setPw(""); setConf(""); setTimeout(()=>setDone(false), 2500);
+    window.CG.requireAuth(()=>{
+      if(op && window.CG.write){
+        window.CG.write(op, { adminPassword:pw, confirm:"RESET" }).then(function(r){
+          if(r && r.ok){ if(window.CG.refresh) window.CG.refresh(); }
+          else if(r && r.error){ window.alert("No se pudo: "+r.error); }
+        });
+      }
+      setDone(true); setPw(""); setConf(""); setTimeout(()=>setDone(false), 2500);
+    }, `Acción NO reversible: ${title}. Autoriza con tu PIN.`);
   };
   return (
     <div style={{ borderRadius:16, padding:18, background:bg, border:`1px solid ${fg}33` }}>
@@ -92,7 +94,7 @@ function ProductosScreen({ ai }) {
   const W = (op,params)=> window.CG.write && window.CG.write(op,params).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
   const addProd = ()=>{ const n=window.prompt("Nombre del producto nuevo"); if(!n||!n.trim()) return; setProds(a=>[{ n:n.trim(), tipo:"Hijo", rend:null, precio:0, stock:0 }, ...a]); W("product.create",{name:n.trim()}); };
   const editProd = (p)=>{ const n=window.prompt("Nombre del producto", p.n); if(n&&n.trim()){ setProds(a=>a.map(x=>x===p?{...x, n:n.trim()}:x)); if(p.id) W("product.update",{id:p.id, name:n.trim()}); } };
-  const delProd = (p)=>{ if(!window.confirm(`¿Eliminar ${p.n}?`)) return; setProds(a=>a.filter(x=>x!==p)); if(p.id) W("product.delete",{id:p.id}); };
+  const delProd = (p)=>window.CG.requireAuth(()=>{ setProds(a=>a.filter(x=>x!==p)); if(p.id) W("product.delete",{id:p.id}); }, `¿Eliminar ${p.n}? Autoriza con tu PIN.`);
   return (
     <div>
       <ScreenHead title="Productos" desc="Catálogo completo: piezas padre (se despiezan) e hijas (se venden). El % de rendimiento viene de las recetas."
@@ -352,8 +354,8 @@ function SmallAct({ icon, label, color, bg, onClick }) {
 /* ---------- CAJA ---------- */
 function CajaScreen({ ai }) {
   const [txs, setTxs] = useState(()=> ((window.CG.config && window.CG.config.caja) || []).slice());
-  const delTx = (i, t)=>{ setTxs(a=>a.filter((_,j)=>j!==i));
-    if (t.id && window.CG.write) window.CG.write("tx.delete",{ id:t.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); };
+  const delTx = (i, t)=>window.CG.requireAuth(()=>{ setTxs(a=>a.filter((_,j)=>j!==i));
+    if (t.id && window.CG.write) window.CG.write("tx.delete",{ id:t.id }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); }, "¿Eliminar este movimiento de caja? Autoriza con tu PIN.");
   const [desc, setDesc] = useState("");
   const [cat, setCat] = useState("");
   const [tipo, setTipo] = useState("Ingreso");

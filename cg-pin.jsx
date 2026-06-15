@@ -21,6 +21,12 @@ window.CG.requirePin = function (kind, onOk, opts) {
   window.CG._pinReq = { kind: kind, onOk: onOk, opts: opts || {} };
   window.dispatchEvent(new Event("cg:pin"));
 };
+// Autoriza una acción sensible / no reversible con el PIN de privacidad (= PIN de autorización).
+// Uso: CG.requireAuth(() => { ...acción... }, "¿Eliminar el pedido #123?")
+window.CG.requireAuth = function (onOk, msg) {
+  if (window.CG.requirePin) window.CG.requirePin("privacy", onOk, { msg: msg || "Confirma con tu PIN para autorizar esta acción", auth: true });
+  else onOk && onOk();
+};
 
 const PIN_LABEL = { privacy: "PIN de privacidad", cedis: "Código de verificación CEDIS", frio: "Código del área de Frío" };
 
@@ -84,7 +90,8 @@ function PinGate() {
         borderRadius:18, border:`1px solid ${Cp.line||"#0001"}`, padding:"22px 20px", display:"flex",
         flexDirection:"column", gap:16, boxShadow:"0 30px 80px -30px rgba(0,0,0,0.5)" }}>
         <div style={{ textAlign:"center" }}>
-          <div style={{ font:`700 15px/1.2 ${Fp.ui}`, color:Cp.ink }}>{PIN_LABEL[req.kind] || "Ingresa el PIN"}</div>
+          <div style={{ fontSize:26, marginBottom:2 }}>{req.opts.auth ? "🛡️" : "🔒"}</div>
+          <div style={{ font:`700 15px/1.2 ${Fp.ui}`, color:Cp.ink }}>{req.opts.auth ? "Autorización requerida" : (PIN_LABEL[req.kind] || "Ingresa el PIN")}</div>
           <div style={{ font:`500 12px/1.3 ${Fp.ui}`, color:Cp.inkSoft, marginTop:5 }}>{req.opts.msg || "Ingresa tu PIN de 4 dígitos"}</div>
         </div>
         <PinPad tone={Cp.red} onSubmit={(v)=>{

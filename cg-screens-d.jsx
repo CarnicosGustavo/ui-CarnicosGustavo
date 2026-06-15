@@ -32,11 +32,10 @@ function RendimientoScreen({ ai }) {
     }
     goTo("panel");
   };
-  const calibrar = ()=>{
-    if (!window.confirm("¿Recalibrar los % de TODAS las recetas con los pesos reales capturados hoy? Esta acción modifica las recetas.")) return;
+  const calibrar = ()=>window.CG.requireAuth(()=>{
     if (window.CG.write) window.CG.write("yield.calibrate", {}).then(function(rr){ if(rr&&rr.ok&&window.CG.refresh) window.CG.refresh(); });
     goTo("recetas");
-  };
+  }, "¿Recalibrar los % de TODAS las recetas con los pesos reales de hoy? Modifica las recetas — autoriza con tu PIN.");
 
   const totEst = r.piezas.reduce((s,p)=>s+p.est,0);
   const totReal = reales.reduce((s,v)=>s+(+v||0),0);
