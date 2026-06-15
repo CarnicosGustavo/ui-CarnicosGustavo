@@ -10,7 +10,8 @@ import ReactDOM from "react-dom";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FILES = [
-	"cg-data", "cg-ui", "cg-antonella", "cg-ai-kit", "cg-cold",
+	"cg-data",
+	"cg-notif", "cg-ui", "cg-antonella", "cg-ai-kit", "cg-cold",
 	"cg-secure-dashboard", "cg-flows", "cg-screens-prof", "cg-screens-a",
 	"cg-screens-b", "cg-screens-c", "cg-screens-d",
 	"cg-reset-modals",
