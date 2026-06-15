@@ -19,6 +19,165 @@ const USER_UID = process.env.CG_USER_UID || "system";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// === Fase 2: despiece físico (réplica de products.processDisassembly / convertToVariant) ===
+// OJO: la capa serverless NO tiene transacciones. Por eso se VALIDAN padre y
+// recetas ANTES de escribir; aun así la operación no es 100% atómica.
+const norPieces = (v) => (v > 50 ? v / 1000 : v);
+const norRatio = (v) => (v > 1 ? v / 1000 : v);
+
+async function disassemble(db, args) {
+	const qty = Math.round(Number(args.quantityToProcess) || 0);
+	const type = args.transformationType || "BASE";
+	if (!args.parentProductId || qty <= 0) return { error: "parentProductId y quantityToProcess>0 requeridos" };
+	const { data: parent } = await db.from("products")
+		.select("id, name, stock_pieces, weighed_pieces, stock_kg").eq("id", args.parentProductId).single();
+	if (!parent) return { error: "producto padre no encontrado" };
+	if (Number(parent.stock_pieces) < qty) return { error: `stock insuficiente: hay ${parent.stock_pieces} canales, se piden ${qty}` };
+	// recetas efectivas: BASE + tipo, dedup por hijo (el tipo específico gana)
+	const types = type === "BASE" ? ["BASE"] : ["BASE", type];
+	const { data: recs } = await db.from("product_transformations")
+		.select("child_product_id, yield_quantity_pieces, yield_weight_ratio, transformation_type")
+		.eq("parent_product_id", parent.id).in("transformation_type", types).eq("is_active", true);
+	const eff = new Map();
+	for (const r of recs || []) if (r.transformation_type === "BASE") eff.set(r.child_product_id, r);
+	for (const r of recs || []) if (r.transformation_type === type) eff.set(r.child_product_id, r);
+	if (eff.size === 0) return { error: `no hay recetas activas para despiezar ${parent.name} (${type})` };
+	// peso por pieza del padre (real)
+	const stockKg = Number(parent.stock_kg || 0);
+	const parentAvg = Number(parent.stock_pieces) > 0 ? stockKg / Number(parent.stock_pieces) : 0;
+	const kgToRemove = qty * parentAvg;
+	// 1) descontar el padre
+	const nextPieces = Number(parent.stock_pieces) - qty;
+	const nextWeighed = Math.max(0, Math.min(Number(parent.weighed_pieces || 0), nextPieces));
+	await db.from("products").update({
+		stock_pieces: nextPieces, weighed_pieces: nextWeighed,
+		stock_kg: Math.max(0, stockKg - kgToRemove).toFixed(3),
+	}).eq("id", parent.id);
+	await db.from("inventory_transactions").insert({
+		product_id: parent.id, quantity_change_pieces: -qty,
+		quantity_change_kg: kgToRemove ? (-kgToRemove).toFixed(3) : null,
+		transaction_type: "DESPIECE", reference_id: parent.id,
+		notes: `Salida por despiece ${type}`,
+	});
+	// 2) sumar los hijos
+	let children = 0;
+	for (const r of eff.values()) {
+		const cp = Math.round(qty * norPieces(Number(r.yield_quantity_pieces)));
+		const ck = qty * norRatio(Number(r.yield_weight_ratio)) * parentAvg;
+		const { data: child } = await db.from("products").select("stock_pieces, stock_kg").eq("id", r.child_product_id).single();
+		if (!child) continue;
+		await db.from("products").update({
+			stock_pieces: Number(child.stock_pieces) + cp,
+			stock_kg: (Number(child.stock_kg || 0) + ck).toFixed(3),
+		}).eq("id", r.child_product_id);
+		await db.from("inventory_transactions").insert({
+			product_id: r.child_product_id, quantity_change_pieces: cp,
+			quantity_change_kg: ck ? ck.toFixed(3) : null,
+			transaction_type: "DESPIECE", reference_id: parent.id,
+			notes: `Entrada por despiece ${type} de ${parent.name}`,
+		});
+		children++;
+	}
+	return { parentProductId: parent.id, processed: qty, childrenCreated: children };
+}
+
+async function toVariant(db, args) {
+	const pieces = Math.round(Number(args.pieces) || 0);
+	if (!args.baseProductId || !args.variantProductId || pieces <= 0)
+		return { error: "baseProductId, variantProductId y pieces>0 requeridos" };
+	const { data: tr } = await db.from("product_transformations")
+		.select("yield_weight_ratio").eq("parent_product_id", args.baseProductId)
+		.eq("child_product_id", args.variantProductId).eq("is_variant", true).limit(1);
+	const ratio = tr && tr[0] ? (Number(tr[0].yield_weight_ratio) || 1) : 1;
+	const { data: base } = await db.from("products").select("stock_pieces, stock_kg, avg_weight_per_piece_kg").eq("id", args.baseProductId).single();
+	const { data: variant } = await db.from("products").select("stock_pieces, stock_kg").eq("id", args.variantProductId).single();
+	if (!base || !variant) return { error: "producto base o variante no encontrado" };
+	const baseAvg = Number(base.stock_pieces) > 0 ? Number(base.stock_kg) / Number(base.stock_pieces) : Number(base.avg_weight_per_piece_kg || 0);
+	const kgBase = pieces * baseAvg;
+	const kgVar = kgBase * ratio;
+	await db.from("products").update({ stock_pieces: Number(base.stock_pieces) - pieces, stock_kg: (Number(base.stock_kg) - kgBase).toFixed(3) }).eq("id", args.baseProductId);
+	await db.from("products").update({ stock_pieces: Number(variant.stock_pieces) + pieces, stock_kg: (Number(variant.stock_kg) + kgVar).toFixed(3) }).eq("id", args.variantProductId);
+	await db.from("inventory_transactions").insert({ product_id: args.baseProductId, quantity_change_pieces: -pieces, quantity_change_kg: kgBase ? (-kgBase).toFixed(3) : null, transaction_type: "VARIANTE", reference_id: args.variantProductId, notes: "Conversión a variante" });
+	await db.from("inventory_transactions").insert({ product_id: args.variantProductId, quantity_change_pieces: pieces, quantity_change_kg: kgVar ? kgVar.toFixed(3) : null, transaction_type: "VARIANTE", reference_id: args.baseProductId, notes: "Conversión a variante" });
+	return { baseProductId: args.baseProductId, variantProductId: args.variantProductId, pieces };
+}
+
+// === Fase 0: integridad de inventario (réplica de la lógica de M1) ===
+
+// Descuenta inventario por una venta. Por cada order_item con product_id baja
+// stock_pieces y stock_kg y registra una transacción VENTA. OJO: en ui-CG
+// order_items.quantity_kg está en GRAMOS (kg×1000); stock_kg está en kg.
+async function deductInventoryForOrder(db, orderId) {
+	const { data: items } = await db
+		.from("order_items")
+		.select("product_id, quantity_pieces, quantity_kg")
+		.eq("order_id", orderId);
+	for (const it of items || []) {
+		if (!it.product_id) continue;
+		const { data: prod } = await db
+			.from("products")
+			.select("stock_pieces, weighed_pieces, stock_kg")
+			.eq("id", it.product_id)
+			.single();
+		if (!prod) continue;
+		const kg = it.quantity_kg ? Number(it.quantity_kg) / 1000 : 0; // gramos→kg
+		const pieces = it.quantity_pieces ? Number(it.quantity_pieces) : 0;
+		const nextPieces = pieces ? Number(prod.stock_pieces || 0) - pieces : Number(prod.stock_pieces || 0);
+		const nextWeighed = Math.max(0, Math.min(Number(prod.weighed_pieces || 0), nextPieces));
+		const nextKg = Number(prod.stock_kg || 0) - kg; // puede quedar negativo: se compensa al despiezar
+		await db.from("products").update({
+			stock_pieces: nextPieces,
+			weighed_pieces: nextWeighed,
+			stock_kg: nextKg.toFixed(3),
+		}).eq("id", it.product_id);
+		await db.from("inventory_transactions").insert({
+			product_id: it.product_id,
+			quantity_change_pieces: pieces ? -pieces : null,
+			quantity_change_kg: kg > 0 ? (-kg).toFixed(3) : null,
+			transaction_type: "VENTA",
+			reference_id: orderId,
+			notes: `Venta pedido #${orderId}`,
+		});
+	}
+}
+
+// Recalcula el stock de los canales: comprado (todas las fechas) − despiezado.
+// Idempotente: re-guardar la compra no genera doble conteo. Réplica de M1.
+async function syncCanalStock(db, uid) {
+	const { data: purch } = await db
+		.from("channel_purchases")
+		.select("qty_americano, qty_nacional")
+		.eq("user_uid", uid);
+	let amer = 0, nac = 0;
+	for (const r of purch || []) { amer += Number(r.qty_americano) || 0; nac += Number(r.qty_nacional) || 0; }
+	const { data: canales } = await db
+		.from("products")
+		.select("id, name, avg_weight_per_piece_kg")
+		.eq("user_uid", uid)
+		.eq("is_parent_product", true)
+		.ilike("name", "CANAL%");
+	if (!canales || !canales.length) return;
+	const { data: used } = await db
+		.from("inventory_transactions")
+		.select("product_id, quantity_change_pieces")
+		.eq("transaction_type", "DESPIECE");
+	const usedMap = {};
+	for (const u of used || []) {
+		const pid = Number(u.product_id);
+		usedMap[pid] = (usedMap[pid] || 0) + (-(Number(u.quantity_change_pieces) || 0));
+	}
+	for (const c of canales) {
+		const n = String(c.name).toUpperCase();
+		const purchased = n.includes("AMERICANO") ? amer : n.includes("NACIONAL") ? nac : 0;
+		const stock = purchased - (usedMap[Number(c.id)] || 0);
+		const avg = Number(c.avg_weight_per_piece_kg) || 0;
+		await db.from("products").update({
+			stock_pieces: stock,
+			stock_kg: (stock * avg).toFixed(3),
+		}).eq("id", c.id);
+	}
+}
+
 export default async function handler(req, res) {
 	if (req.method !== "POST")
 		return res.status(405).json({ error: "Método no permitido" });
@@ -243,9 +402,148 @@ export default async function handler(req, res) {
 				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
 			}
 
+			// ---------- PEDIDOS: editar cabecera (estado/total/cliente/notas) ----------
+			// total_amount entra en PESOS y se guarda en CENTAVOS (convención ui-CG).
+			case "order.update": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.status !== undefined) patch.status = p.status;
+				if (p.total_amount !== undefined) patch.total_amount = Math.round(Number(p.total_amount) * 100);
+				if (p.customerId !== undefined) patch.customer_id = p.customerId;
+				if (p.notes !== undefined) patch.notes = p.notes;
+				if (!Object.keys(patch).length) return fail("nada que actualizar");
+				const { error } = await db.from("orders").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+
+			// ---------- PEDIDOS: eliminar (items + cabecera) ----------
+			case "order.delete": {
+				if (!p.id) return fail("id requerido");
+				const { error: e1 } = await db.from("order_items").delete().eq("order_id", p.id);
+				if (e1) throw e1;
+				const { error } = await db.from("orders").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+
+			// ---------- PEDIDOS: reemplazar renglones (edición completa) ----------
+			// Réplica de orders.replaceItems de M1: borra los renglones, recrea desde
+			// items[], recalcula total/estado/requires_weighing y sincroniza el monto
+			// de un cargo a crédito o transacción ya asociados al pedido.
+			case "order.replaceItems": {
+				if (!p.orderId || !Array.isArray(p.items)) return fail("orderId e items[] requeridos");
+				const rows = p.items.map((it) => {
+					const unit = Math.round(Number(it.price || 0) * 100); // centavos
+					const pieces = Math.max(0, parseInt(it.pieces || 0, 10));
+					const kg = Number(it.kg || 0);
+					const itemWeigh = it.byWeight && !(kg > 0);
+					const sub = kg > 0 ? Math.round(unit * kg) : unit * pieces;
+					return {
+						product_id: it.productId || null,
+						product_name: it.productName || "Producto",
+						quantity_pieces: pieces || null,
+						quantity_kg: kg > 0 ? Math.round(kg * 1000) : null, // gramos
+						unit_price: unit,
+						subtotal: sub,
+						status: itemWeigh ? "PENDIENTE_PESAJE" : "COMPLETADO",
+					};
+				});
+				const total = rows.reduce((s, r) => s + r.subtotal, 0);
+				const needWeigh = rows.some((r) => r.status === "PENDIENTE_PESAJE");
+				const { error: ed } = await db.from("order_items").delete().eq("order_id", p.orderId);
+				if (ed) throw ed;
+				for (const r of rows) {
+					const { error: ie } = await db.from("order_items").insert({ ...r, order_id: p.orderId });
+					if (ie) throw ie;
+				}
+				const upd = { total_amount: total, requires_weighing: needWeigh };
+				upd.status = p.status !== undefined ? p.status : (needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO");
+				if (p.customerId !== undefined) upd.customer_id = p.customerId;
+				if (p.notes !== undefined) upd.notes = p.notes;
+				const { error } = await db.from("orders").update(upd).eq("id", p.orderId);
+				if (error) throw error;
+				// Mantener consistentes montos ya cobrados/cargados de este pedido.
+				await db.from("credit_charges").update({ amount: (total / 100).toFixed(2) }).eq("order_id", p.orderId);
+				await db.from("transactions").update({ amount: total }).eq("order_id", p.orderId);
+				return ok({ orderId: p.orderId, total, status: upd.status });
+			}
+
+			// ---------- DESPIECE FÍSICO ----------
+			case "despiece.process": {
+				const r = await disassemble(db, p);
+				if (r.error) return fail(r.error);
+				return ok(r);
+			}
+			case "despiece.toVariant": {
+				const r = await toVariant(db, p);
+				if (r.error) return fail(r.error);
+				return ok(r);
+			}
+
+			// ---------- RECETAS (product_transformations) ----------
+			case "recipe.upsert": {
+				if (!p.parentProductId || !p.childProductId || !p.transformationType)
+					return fail("parentProductId, childProductId y transformationType requeridos");
+				const row = {
+					parent_product_id: p.parentProductId,
+					child_product_id: p.childProductId,
+					yield_quantity_pieces: Number(p.yieldQuantityPieces ?? 0).toFixed(2),
+					yield_weight_ratio: Number(p.yieldWeightRatio ?? 0).toFixed(4),
+					transformation_type: p.transformationType,
+					is_active: p.isActive !== false,
+				};
+				let id = p.id;
+				if (id) {
+					const { error } = await db.from("product_transformations").update(row).eq("id", id);
+					if (error) throw error;
+				} else {
+					// upsert por (parent, child, type)
+					const { data: ex } = await db.from("product_transformations").select("id")
+						.eq("parent_product_id", p.parentProductId).eq("child_product_id", p.childProductId)
+						.eq("transformation_type", p.transformationType).limit(1);
+					if (ex && ex[0]) { id = ex[0].id; await db.from("product_transformations").update(row).eq("id", id); }
+					else { const { data, error } = await db.from("product_transformations").insert(row).select("id").single(); if (error) throw error; id = data.id; }
+				}
+				// marcar al padre como despiezable
+				await db.from("products").update({ is_parent_product: true }).eq("id", p.parentProductId);
+				return ok({ id });
+			}
+			case "recipe.quickUpdate": {
+				if (!p.id) return fail("id requerido");
+				const set = {};
+				if (p.yieldQuantityPieces !== undefined) set.yield_quantity_pieces = Number(p.yieldQuantityPieces).toFixed(2);
+				if (p.yieldWeightRatio !== undefined) set.yield_weight_ratio = Number(p.yieldWeightRatio).toFixed(4);
+				if (p.isVariant !== undefined) set.is_variant = !!p.isVariant;
+				if (!Object.keys(set).length) return fail("nada que actualizar");
+				const { error } = await db.from("product_transformations").update(set).eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+			case "recipe.setActive": {
+				if (!p.id || p.isActive === undefined) return fail("id e isActive requeridos");
+				const { error } = await db.from("product_transformations").update({ is_active: !!p.isActive }).eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+			case "recipe.setRefWeight": {
+				if (!p.productId) return fail("productId requerido");
+				const kg = Number(p.kg) || 0;
+				const { error } = await db.from("products").update({ avg_weight_per_piece_kg: kg > 0 ? kg.toFixed(3) : null }).eq("id", p.productId);
+				if (error) throw error;
+				return ok({ productId: p.productId });
+			}
+			case "recipe.classifyOrphan": {
+				if (!p.productId || !["purchased", "duplicate"].includes(p.action)) return fail("productId y action(purchased|duplicate) requeridos");
+				const category = p.action === "purchased" ? "Compra" : "Duplicado";
+				const { error } = await db.from("products").update({ category }).eq("id", p.productId);
+				if (error) throw error;
+				return ok({ productId: p.productId, category });
+			}
+
 			// ---------- COMPRA DEL DÍA (channel_purchases) ----------
-			// Reemplaza las compras de HOY del usuario. No re-sincroniza stock de
-			// canales (a validar; la lógica de M1 lo hace).
+			// Reemplaza las compras de HOY del usuario y RE-SINCRONIZA el stock de
+			// canales (comprado − despiezado), idéntico a M1. Idempotente.
 			case "purchases.save": {
 				if (!Array.isArray(p.rows)) return fail("rows[] requerido");
 				const d = today();
@@ -262,6 +560,7 @@ export default async function handler(req, res) {
 					});
 					if (error) throw error;
 				}
+				await syncCanalStock(db, USER_UID);
 				return ok({ saved: p.rows.length });
 			}
 
@@ -323,6 +622,11 @@ export default async function handler(req, res) {
 			case "order.priceAndCharge": {
 				if (!p.orderId || !Array.isArray(p.items) || !p.items.length)
 					return fail("orderId e items[] requeridos");
+				// Estado previo: si ya estaba COMPLETADA, NO se vuelve a descontar
+				// inventario (evita doble baja en re-cobros).
+				const { data: ordPrev } = await db.from("orders")
+					.select("status, customer_id").eq("id", p.orderId).single();
+				const alreadyCharged = ordPrev?.status === "COMPLETADA";
 				let total = 0;
 				for (const it of p.items) {
 					const { data: oi } = await db.from("order_items")
@@ -333,11 +637,12 @@ export default async function handler(req, res) {
 					total += sub;
 					await db.from("order_items").update({ unit_price: unit, subtotal: sub, status: "COMPLETADO" }).eq("id", it.orderItemId);
 				}
+				// Descuento de inventario (réplica de M1 completeOrderPayment).
+				if (!alreadyCharged) await deductInventoryForOrder(db, p.orderId);
 				await db.from("orders").update({ total_amount: total, status: "COMPLETADA" }).eq("id", p.orderId);
-				const { data: ord } = await db.from("orders").select("customer_id").eq("id", p.orderId).single();
 				if (p.paymentType === "credito") {
-					if (ord?.customer_id) await db.from("credit_charges").insert({
-						customer_id: ord.customer_id, amount: (total / 100).toFixed(2),
+					if (ordPrev?.customer_id) await db.from("credit_charges").insert({
+						customer_id: ordPrev.customer_id, amount: (total / 100).toFixed(2),
 						concept: `Pedido #${p.orderId}`, source: "pedido", order_id: p.orderId, charge_date: today(),
 					});
 				} else {
@@ -346,7 +651,7 @@ export default async function handler(req, res) {
 						category: "Ventas", status: "completed", user_uid: USER_UID, order_id: p.orderId,
 					});
 				}
-				return ok({ orderId: p.orderId, total });
+				return ok({ orderId: p.orderId, total, inventoryDeducted: !alreadyCharged });
 			}
 
 			default:
@@ -357,3 +662,5 @@ export default async function handler(req, res) {
 		return res.status(500).json({ error: e?.message || "Error de escritura" });
 	}
 }
+
+export { deductInventoryForOrder, syncCanalStock, disassemble, toVariant };
