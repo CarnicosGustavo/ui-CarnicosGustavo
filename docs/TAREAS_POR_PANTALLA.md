@@ -30,7 +30,9 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Despiece
 - ✅ Selección de canal, stepper, navegación
-- ⏳ **Despiezar / Despiezar N** no persiste → `products.processDisassembly`
+- ✅ **Despiezar / Despiezar N** persiste → `despiece.process` (descuenta canal, suma hijos
+  por receta efectiva BASE+tipo, registra transacciones); usa `canal.pid` + `canal.tt` reales
+- ✅ **"Pedidas" = demanda viva** real: `ped` por pieza desde order_items de pedidos abiertos
 
 ## Báscula
 - ✅ Recipientes/tara/neto, navegación de artículos

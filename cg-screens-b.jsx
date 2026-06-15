@@ -15,6 +15,10 @@ function DespieceScreen({ ai }) {
   const [canales, setCanales] = useState(d.canales);
   const canal = canales.find(x=>x.id===sel) || canales[0];
   const despiezar = ()=>{
+    if (canal && canal.pid && window.CG.write) {
+      window.CG.write("despiece.process", { parentProductId:canal.pid, quantityToProcess:n, transformationType:canal.tt||"BASE" })
+        .then(function(r){ if(r && r.ok && window.CG.refresh) window.CG.refresh(); });
+    }
     setCanales(cs=>cs.map(c=>c.id===sel ? { ...c, disp:Math.max(0, c.disp-n) } : c));
     window.__cgGo && window.__cgGo("bascula");
   };

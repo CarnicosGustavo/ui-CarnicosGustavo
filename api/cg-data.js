@@ -249,6 +249,27 @@ export default async function handler(req, res) {
 		};
 		const canales = parents.filter((p) => (p.name || "").toUpperCase().includes("CANAL")).map(canalOf);
 		canales.forEach((c, i) => { c.tono = ["red", "blue", "green"][i % 3]; });
+		// transformation_type real por canal (para despiece.process). Prefiere el tipo
+		// específico (AMERICANO/NACIONAL_*) sobre BASE.
+		if (canales.length) {
+			const { data: tts } = await db.from("product_transformations")
+				.select("parent_product_id, transformation_type")
+				.in("parent_product_id", canales.map((c) => c.pid)).eq("is_active", true);
+			const ttMap = new Map();
+			for (const t of tts || []) if (!ttMap.has(t.parent_product_id) || t.transformation_type !== "BASE") ttMap.set(t.parent_product_id, t.transformation_type);
+			canales.forEach((c) => { c.tt = ttMap.get(c.pid) || "BASE"; });
+		}
+		// demanda viva: piezas pedidas en pedidos abiertos (para "Pedidas").
+		const demand = new Map();
+		try {
+			const { data: openO } = await scoped(db.from("orders").select("id"))
+				.in("status", ["PENDIENTE_PESAJE", "PARCIAL_DISPONIBLE", "LISTA_PARA_COBRO", "PROCESANDO_PAGO"]);
+			const oids = (openO || []).map((o) => o.id);
+			if (oids.length) {
+				const { data: ois } = await db.from("order_items").select("product_id, quantity_pieces").in("order_id", oids);
+				for (const it of ois || []) if (it.product_id != null) demand.set(it.product_id, (demand.get(it.product_id) || 0) + num(it.quantity_pieces));
+			}
+		} catch (e) { console.error("despiece.demand", e?.message); }
 		const main = canales[0];
 		let piezas = [];
 		if (main) {
@@ -259,7 +280,7 @@ export default async function handler(req, res) {
 				n: t.products?.name || "—",
 				pz: num(t.yield_quantity_pieces),
 				pct: +(num(t.yield_weight_ratio) * 100).toFixed(2),
-				ped: 0,
+				ped: demand.get(t.child_product_id) || 0,
 				...(t.products?.is_parent_product ? { hijo: true } : {}),
 			}));
 		}
