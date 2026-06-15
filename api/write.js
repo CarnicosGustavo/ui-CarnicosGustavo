@@ -301,6 +301,73 @@ export default async function handler(req, res) {
 				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
 			}
 
+			// ---------- PEDIDOS: editar cabecera (estado/total/cliente/notas) ----------
+			// total_amount entra en PESOS y se guarda en CENTAVOS (convención ui-CG).
+			case "order.update": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.status !== undefined) patch.status = p.status;
+				if (p.total_amount !== undefined) patch.total_amount = Math.round(Number(p.total_amount) * 100);
+				if (p.customerId !== undefined) patch.customer_id = p.customerId;
+				if (p.notes !== undefined) patch.notes = p.notes;
+				if (!Object.keys(patch).length) return fail("nada que actualizar");
+				const { error } = await db.from("orders").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+
+			// ---------- PEDIDOS: eliminar (items + cabecera) ----------
+			case "order.delete": {
+				if (!p.id) return fail("id requerido");
+				const { error: e1 } = await db.from("order_items").delete().eq("order_id", p.id);
+				if (e1) throw e1;
+				const { error } = await db.from("orders").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({ id: p.id });
+			}
+
+			// ---------- PEDIDOS: reemplazar renglones (edición completa) ----------
+			// Réplica de orders.replaceItems de M1: borra los renglones, recrea desde
+			// items[], recalcula total/estado/requires_weighing y sincroniza el monto
+			// de un cargo a crédito o transacción ya asociados al pedido.
+			case "order.replaceItems": {
+				if (!p.orderId || !Array.isArray(p.items)) return fail("orderId e items[] requeridos");
+				const rows = p.items.map((it) => {
+					const unit = Math.round(Number(it.price || 0) * 100); // centavos
+					const pieces = Math.max(0, parseInt(it.pieces || 0, 10));
+					const kg = Number(it.kg || 0);
+					const itemWeigh = it.byWeight && !(kg > 0);
+					const sub = kg > 0 ? Math.round(unit * kg) : unit * pieces;
+					return {
+						product_id: it.productId || null,
+						product_name: it.productName || "Producto",
+						quantity_pieces: pieces || null,
+						quantity_kg: kg > 0 ? Math.round(kg * 1000) : null, // gramos
+						unit_price: unit,
+						subtotal: sub,
+						status: itemWeigh ? "PENDIENTE_PESAJE" : "COMPLETADO",
+					};
+				});
+				const total = rows.reduce((s, r) => s + r.subtotal, 0);
+				const needWeigh = rows.some((r) => r.status === "PENDIENTE_PESAJE");
+				const { error: ed } = await db.from("order_items").delete().eq("order_id", p.orderId);
+				if (ed) throw ed;
+				for (const r of rows) {
+					const { error: ie } = await db.from("order_items").insert({ ...r, order_id: p.orderId });
+					if (ie) throw ie;
+				}
+				const upd = { total_amount: total, requires_weighing: needWeigh };
+				upd.status = p.status !== undefined ? p.status : (needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO");
+				if (p.customerId !== undefined) upd.customer_id = p.customerId;
+				if (p.notes !== undefined) upd.notes = p.notes;
+				const { error } = await db.from("orders").update(upd).eq("id", p.orderId);
+				if (error) throw error;
+				// Mantener consistentes montos ya cobrados/cargados de este pedido.
+				await db.from("credit_charges").update({ amount: (total / 100).toFixed(2) }).eq("order_id", p.orderId);
+				await db.from("transactions").update({ amount: total }).eq("order_id", p.orderId);
+				return ok({ orderId: p.orderId, total, status: upd.status });
+			}
+
 			// ---------- COMPRA DEL DÍA (channel_purchases) ----------
 			// Reemplaza las compras de HOY del usuario y RE-SINCRONIZA el stock de
 			// canales (comprado − despiezado), idéntico a M1. Idempotente.

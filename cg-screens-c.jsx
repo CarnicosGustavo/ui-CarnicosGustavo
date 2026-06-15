@@ -96,7 +96,7 @@ function PedidosScreen({ ai }) {
     { label:"Duplicar", icon:"copy", onClick:()=>setExtra(arr=>[{ ...p, id:360+arr.length }, ...arr]) },
     { label:"Enviar por WhatsApp", icon:"message-circle", onClick:()=>waOpen("", `Pedido #${p.id} de ${p.cliente}`) },
     { sep:true },
-    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>setOver(o=>({ ...o, [p.id]:{ estado:"Cancelada" } })) }] : []),
+    ...(p.estado!=="Cancelada" ? [{ label:"Cancelar pedido", icon:"ban", onClick:()=>{ if(window.CG.write) window.CG.write("order.update",{ id:p.id, status:"cancelled" }).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); }); setOver(o=>({ ...o, [p.id]:{ estado:"Cancelada" } })); } }] : []),
     { label:"Eliminar", icon:"trash-2", danger:true, onClick:()=>setHidden(h=>[...h, p.id]) },
   ];
 

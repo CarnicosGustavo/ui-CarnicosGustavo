@@ -165,9 +165,16 @@ export default async function handler(req, res) {
 		const { data } = await scoped(db.from("orders").select("id, total_amount, status, created_at, requires_weighing, customer_id, customers(name)"))
 			.order("id", { ascending: false }).limit(40);
 		orders = data || [];
+		// conteo real de artículos por pedido
+		const _oids = orders.map((o) => o.id);
+		const _cnt = {};
+		if (_oids.length) {
+			const { data: _oi } = await db.from("order_items").select("order_id").in("order_id", _oids);
+			for (const r of _oi || []) _cnt[r.order_id] = (_cnt[r.order_id] || 0) + 1;
+		}
 		if (orders.length) out.ops.pedidos = orders.map((o) => ({
 			id: o.id, cliente: o.customers?.name || `Cliente #${o.id}`,
-			total: c2p(o.total_amount), estado: estadoLabel(o.status), fecha: fechaCorta(o.created_at), items: 0,
+			total: c2p(o.total_amount), estado: estadoLabel(o.status), fecha: fechaCorta(o.created_at), items: _cnt[o.id] || 0,
 		}));
 	} catch (e) { console.error("ops.pedidos", e?.message); }
 
