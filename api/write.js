@@ -102,6 +102,54 @@ async function toVariant(db, args) {
 	return { baseProductId: args.baseProductId, variantProductId: args.variantProductId, pieces };
 }
 
+// Auto-despiece por pedidos: cubre el FALTANTE (demanda viva − stock) despiezando
+// solo los canales necesarios. Réplica de yields.suggestDespiecePlan + ejecución.
+// Idempotente: si el stock ya cubre la demanda, no hace nada. No es atómico.
+async function autoDisassemble(db) {
+	const { data: dem } = await db.from("order_items")
+		.select("product_id, quantity_pieces").eq("status", "PENDIENTE_PESAJE");
+	const demand = {};
+	for (const d of dem || []) if (d.product_id) demand[d.product_id] = (demand[d.product_id] || 0) + (Number(d.quantity_pieces) || 0);
+	if (!Object.keys(demand).length) return { executed: [], canalsProcessed: 0, reason: "sin demanda" };
+	const { data: canales } = await db.from("products")
+		.select("id, name, stock_pieces").eq("is_parent_product", true).ilike("name", "CANAL%");
+	const withStock = (canales || []).filter((c) => Number(c.stock_pieces) > 0);
+	if (!withStock.length) return { executed: [], canalsProcessed: 0, reason: "sin canales en stock" };
+	const ids = withStock.map((c) => c.id);
+	const { data: recs } = await db.from("product_transformations")
+		.select("parent_product_id, child_product_id, yield_quantity_pieces, transformation_type")
+		.in("parent_product_id", ids).eq("is_active", true);
+	const childIds = Object.keys(demand).map(Number);
+	const { data: prods } = await db.from("products").select("id, stock_pieces").in("id", childIds);
+	const stock = {};
+	for (const pr of prods || []) stock[pr.id] = Number(pr.stock_pieces) || 0;
+	const executed = [];
+	for (const canal of withStock) {
+		const canalRecs = (recs || []).filter((r) => r.parent_product_id === canal.id);
+		if (!canalRecs.length) continue;
+		const type = (canalRecs.find((r) => r.transformation_type && r.transformation_type !== "BASE") || canalRecs[0]).transformation_type || "BASE";
+		let need = 0;
+		for (const r of canalRecs) {
+			const d = demand[r.child_product_id] || 0;
+			if (d <= 0) continue;
+			const pzPerCanal = norPieces(Number(r.yield_quantity_pieces));
+			if (pzPerCanal <= 0) continue;
+			const missing = Math.max(0, d - (stock[r.child_product_id] || 0));
+			need = Math.max(need, Math.ceil(missing / pzPerCanal));
+		}
+		const qty = Math.min(need, Number(canal.stock_pieces) || 0);
+		if (qty > 0) {
+			const r = await disassemble(db, { parentProductId: canal.id, quantityToProcess: qty, transformationType: type });
+			if (!r.error) {
+				executed.push({ canalId: canal.id, canal: canal.name, qty, children: r.childrenCreated });
+				// reflejar lo producido en el stock local para no re-despiezar de otro canal
+				for (const rec of canalRecs) stock[rec.child_product_id] = (stock[rec.child_product_id] || 0) + Math.round(qty * norPieces(Number(rec.yield_quantity_pieces)));
+			}
+		}
+	}
+	return { executed, canalsProcessed: executed.length };
+}
+
 // === Fase 3: rendimiento / calibración (réplica de yields.calibrateFromDay de M1) ===
 // Recalcula product_transformations.yield_weight_ratio con pesos REALES del día.
 // En ui-CG las piezas pesadas quedan en order_items.status="COMPLETADO" y
@@ -596,6 +644,13 @@ export default async function handler(req, res) {
 				return ok(r);
 			}
 
+			// Auto-despiece por pedidos (cubre el faltante). Llamar tras order.create
+			// o desde un botón. Devuelve qué canales se despiezaron.
+			case "despiece.auto": {
+				const r = await autoDisassemble(db);
+				return ok(r);
+			}
+
 			// ---------- RECETAS (product_transformations) ----------
 			case "recipe.upsert": {
 				if (!p.parentProductId || !p.childProductId || !p.transformationType)
@@ -855,4 +910,4 @@ export default async function handler(req, res) {
 	}
 }
 
-export { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields };
+export { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields, autoDisassemble };
