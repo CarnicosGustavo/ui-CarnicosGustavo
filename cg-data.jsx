@@ -84,6 +84,7 @@ CG.modules = [
   { id:"cobranza",  label:"Cobranza",       icon:"hand-coins",       group:"op" },
   { id:"clientes",  label:"Clientes",       icon:"users",            group:"op" },
   { id:"pos",       label:"POS",            icon:"shopping-cart",    group:"op" },
+  { id:"cedis",     label:"CEDIS",          icon:"warehouse",        group:"op" },
 ];
 // Submenú de Configuración (rueda dentada → popover)
 CG.configItems = [
@@ -93,6 +94,8 @@ CG.configItems = [
   { id:"cold",      label:"Inventario Frío",icon:"snowflake" },
   { id:"caja",      label:"Caja",           icon:"dollar-sign" },
   { id:"payment",   label:"Métodos de pago",icon:"credit-card" },
+  { id:"validacion", label:"Validación de saldos", icon:"shield-check" },
+  { id:"configAntonella", label:"Antonella", icon:"sparkles" },
   { id:"designsystem", label:"Sistema de Diseño", icon:"shapes" },
   { id:"settings",  label:"Configuración",  icon:"settings" },
 ];
