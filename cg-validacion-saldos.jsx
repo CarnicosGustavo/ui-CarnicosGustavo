@@ -8,42 +8,12 @@ const Fv = window.CG.font;
 const mnyV  = window.money;       // "$1,500.00"
 const mnyVk = window.moneyk;      // "$1.5k"
 
-/* ---- Datos legacy de ejemplo (staging.legacy_credit_*) ---- */
-const LEGACY = [
-  { id:"000412", nombre:"Abarrotes El Sol", saldo:128450.50, limite:150000, dias:30, ndoc:14, validado:false,
-    docs:[
-      { fecha:"2022-01-12", venc:"2022-02-11", tipo:"FAC", ref:"A-7740", importe:42500, saldo:42500, estado:"Vencido", obs:"Pedido quincenal" },
-      { fecha:"2022-02-03", venc:"2022-03-05", tipo:"FAC", ref:"A-7811", importe:38900, saldo:31450.50, estado:"Parcial", obs:"Abonó $7,449.50" },
-      { fecha:"2022-02-20", venc:"2022-03-22", tipo:"NC",  ref:"NC-220", importe:-4200, saldo:-4200, estado:"Aplicado", obs:"Devolución pierna" },
-      { fecha:"2022-03-08", venc:"2022-04-07", tipo:"FAC", ref:"A-7903", importe:58700, saldo:58700, estado:"Vencido", obs:"" },
-    ]},
-  { id:"000118", nombre:"La Carnicería Don Luis", saldo:89200, limite:100000, dias:15, ndoc:9, validado:false,
-    docs:[
-      { fecha:"2022-01-25", venc:"2022-02-09", tipo:"FAC", ref:"A-7765", importe:51200, saldo:51200, estado:"Vencido", obs:"" },
-      { fecha:"2022-02-14", venc:"2022-03-01", tipo:"FAC", ref:"A-7842", importe:38000, saldo:38000, estado:"Vencido", obs:"Confirmar con cliente" },
-    ]},
-  { id:"000507", nombre:"Super Carnes del Valle", saldo:243800, limite:250000, dias:30, ndoc:22, validado:false,
-    docs:[
-      { fecha:"2022-01-05", venc:"2022-02-04", tipo:"FAC", ref:"A-7701", importe:120000, saldo:120000, estado:"Vencido", obs:"Cliente mayoreo grande" },
-      { fecha:"2022-02-18", venc:"2022-03-20", tipo:"FAC", ref:"A-7888", importe:123800, saldo:123800, estado:"Vencido", obs:"" },
-    ]},
-  { id:"000233", nombre:"Tortas y Carnes Lupita", saldo:34600, limite:40000, dias:15, ndoc:6, validado:false,
-    docs:[
-      { fecha:"2022-02-01", venc:"2022-02-16", tipo:"FAC", ref:"A-7790", importe:34600, saldo:34600, estado:"Vencido", obs:"" },
-    ]},
-  { id:"000341", nombre:"Mercado San Juan L-12", saldo:67250, limite:80000, dias:30, ndoc:11, validado:false,
-    docs:[
-      { fecha:"2022-01-19", venc:"2022-02-18", tipo:"FAC", ref:"A-7755", importe:40250, saldo:40250, estado:"Vencido", obs:"" },
-      { fecha:"2022-02-22", venc:"2022-03-24", tipo:"FAC", ref:"A-7901", importe:27000, saldo:27000, estado:"Vencido", obs:"Local nuevo" },
-    ]},
-  { id:"000089", nombre:"Cocina Económica Mary", saldo:12800, limite:20000, dias:8, ndoc:4, validado:true,
-    validadoPor:"Gustavo", validadoAt:"2026-06-10", saldoActual:12800,
-    docs:[
-      { fecha:"2022-02-10", venc:"2022-02-18", tipo:"FAC", ref:"A-7820", importe:12800, saldo:12800, estado:"Vencido", obs:"" },
-    ]},
-  { id:"000620", nombre:"Distribuidora El Novillo", saldo:0, limite:120000, dias:30, ndoc:0, validado:false,
-    docs:[] },
-];
+/* ---- Datos legacy: fuente viva en window.CG.validacion (cg-data.jsx → api/cg-data.js).
+   Con Supabase trae public.credit_balances + código MBPOS + documentos; sin conexión,
+   conserva el mock de respaldo definido en cg-data.jsx. ---- */
+function getLegacy() {
+  return (window.CG && Array.isArray(window.CG.validacion)) ? window.CG.validacion : [];
+}
 
 /* badge por estado de cliente */
 function estadoCliente(c) {
@@ -58,20 +28,39 @@ const DOC_TONE = { "Vencido":"red", "Parcial":"amber", "Aplicado":"blue", "Pagad
    Pantalla principal — controla vista lista / detalle
    ============================================================ */
 function ValidacionSaldosScreen({ ai }) {
-  const [rows, setRows] = useState(LEGACY);
+  const [rows, setRows] = useState(getLegacy);
   const [view, setView] = useState("list");      // "list" | "detail"
   const [selId, setSelId] = useState(null);
   const [confirm, setConfirm] = useState(null);   // cliente a confirmar
   const [toast, setToast] = useState(null);       // { tone, msg }
   const sel = rows.find(r=>r.id===selId);
 
+  // Re-sembrar desde los datos reales cuando llega Supabase (CG.refresh → "cg:data").
+  useEffect(()=>{
+    const h = ()=> setRows(getLegacy());
+    window.addEventListener("cg:data", h);
+    return ()=> window.removeEventListener("cg:data", h);
+  }, []);
+
   const validar = (c) => {
+    const hoy = new Date().toISOString().slice(0,10);
+    // Optimista: marcamos validado de inmediato; Supabase es la fuente de verdad al refrescar.
     setRows(rs => rs.map(r => r.id===c.id
-      ? { ...r, validado:true, validadoPor:"Gustavo", validadoAt:"2026-06-14", saldoActual:r.saldo }
+      ? { ...r, validado:true, validadoPor:"Gustavo", validadoAt:hoy, saldoActual:r.saldo }
       : r));
     setConfirm(null);
     setToast({ tone:"green", msg:`Saldo de ${c.nombre} validado y agregado a crédito` });
     setTimeout(()=>setToast(null), 3200);
+    // Persistir: crea/actualiza cuenta de crédito, siembra el saldo inicial y marca validado.
+    if (c.customerId && window.CG && window.CG.write) {
+      window.CG.write("legacy.validate", {
+        customerId: c.customerId, creditLimit: c.limite, termsDays: c.dias,
+        saldo: c.saldo, validatedBy: "Gustavo",
+      }).then(function(r){
+        if (r && r.ok) { if (window.CG.refresh) window.CG.refresh(); }
+        else if (r && r.error) setToast({ tone:"red", msg:`No se pudo validar: ${r.error}` });
+      });
+    }
   };
   const goDetail = (c) => { setSelId(c.id); setView("detail"); window.scrollTo&&window.scrollTo(0,0); };
 
@@ -123,7 +112,7 @@ function ValidacionSaldosScreen({ ai }) {
    Vista A — Bandeja (lista densa)
    ============================================================ */
 function BandejaValidacion({ rows, onOpen, onValidar, ai }) {
-  const [filtro, setFiltro] = useState("Pendiente");
+  const [filtro, setFiltro] = useState("Todos");
   const [q, setQ] = useState("");
 
   const pend = rows.filter(r=>!r.validado && r.saldo>0);

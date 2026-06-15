@@ -405,5 +405,76 @@ export default async function handler(req, res) {
 		}
 	} catch (e) { console.error("recetas", e?.message); }
 
+	// ---------- validacion (saldos legacy MBPOS → credit_balances) ----------
+	// credit_balances es el SNAPSHOT legacy a validar (customer_id, name, credit_limit,
+	// terms_days, saldo_actual). El código MBPOS sale de staging.legacy_credit_clientes
+	// (best-effort: ese schema puede no estar expuesto a la API). validated_at/by son
+	// columnas opcionales (ver migración); con select("*") no rompe si aún no existen.
+	try {
+		const { data: bal } = await db.from("credit_balances").select("*");
+		if (bal && bal.length) {
+			const ids = bal.map((b) => b.customer_id).filter((x) => x != null);
+			// código MBPOS (staging) — opcional
+			const codeMap = new Map();
+			try {
+				const { data: leg } = await db.schema("staging").from("legacy_credit_clientes")
+					.select("customer_id, legacy_cliente, legacy_int").in("customer_id", ids);
+				for (const r of leg || []) codeMap.set(r.customer_id, r.legacy_cliente || (r.legacy_int != null ? String(r.legacy_int) : null));
+			} catch (e) { console.error("validacion.legacy_map", e?.message); }
+			// documentos: cargos (FAC) + abonos (NC) por cliente
+			const docsMap = new Map();
+			try {
+				const todayStr = new Date().toISOString().slice(0, 10);
+				const termsOf = new Map(bal.map((b) => [b.customer_id, num(b.terms_days)]));
+				const [{ data: charges }, { data: payments }] = await Promise.all([
+					db.from("credit_charges").select("customer_id, amount, concept, charge_date, source, order_id").in("customer_id", ids),
+					db.from("credit_payments").select("customer_id, amount, payment_date, method, notes").in("customer_id", ids),
+				]);
+				for (const ch of charges || []) {
+					const arr = docsMap.get(ch.customer_id) || []; docsMap.set(ch.customer_id, arr);
+					const f = (ch.charge_date || "").slice(0, 10);
+					const venc = f ? new Date(new Date(f).getTime() + (termsOf.get(ch.customer_id) || 0) * 864e5).toISOString().slice(0, 10) : "";
+					arr.push({
+						fecha: f, venc, tipo: "FAC",
+						ref: ch.concept || (ch.order_id ? `#${ch.order_id}` : ""),
+						importe: num(ch.amount), saldo: num(ch.amount),
+						estado: venc && venc < todayStr ? "Vencido" : "Vigente", obs: ch.source || "",
+					});
+				}
+				for (const pa of payments || []) {
+					const arr = docsMap.get(pa.customer_id) || []; docsMap.set(pa.customer_id, arr);
+					arr.push({
+						fecha: (pa.payment_date || "").slice(0, 10), venc: "", tipo: "NC",
+						ref: pa.method || "Abono", importe: -num(pa.amount), saldo: -num(pa.amount),
+						estado: "Aplicado", obs: pa.notes || "",
+					});
+				}
+				for (const arr of docsMap.values()) arr.sort((a, b) => (a.fecha || "").localeCompare(b.fecha || ""));
+			} catch (e) { console.error("validacion.docs", e?.message); }
+
+			out.validacion = bal.map((b) => {
+				const cid = b.customer_id;
+				const docs = docsMap.get(cid) || [];
+				const validado = !!b.validated_at;
+				return {
+					id: codeMap.get(cid) || String(cid).padStart(6, "0"),
+					customerId: cid,
+					nombre: b.name || `Cliente #${cid}`,
+					saldo: num(b.saldo_actual),
+					limite: num(b.credit_limit),
+					dias: num(b.terms_days),
+					ndoc: docs.length,
+					validado,
+					...(validado ? {
+						validadoPor: b.validated_by || "—",
+						validadoAt: String(b.validated_at).slice(0, 10),
+						saldoActual: num(b.saldo_actual),
+					} : {}),
+					docs,
+				};
+			});
+		}
+	} catch (e) { console.error("validacion", e?.message); }
+
 	return res.status(200).json(out);
 }
