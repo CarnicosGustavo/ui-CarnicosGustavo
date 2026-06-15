@@ -128,12 +128,6 @@ function PosScreen({ ai }) {
   const faltan = cart.filter(it=>it.disp==="faltante").length;
   const despiece = cart.filter(it=>it.disp==="despiece").length;
 
-  // Agregar al carrito (acción central del POS) — conserva el id del producto
-  const addItem = (it)=> setCart(c=>{
-    const i = c.findIndex(x=>x.n===it.n);
-    if (i>=0){ const n=[...c]; n[i]={ ...n[i], pz:n[i].pz+1 }; return n; }
-    return [...c, { id:it.id, n:it.n, precio:it.precio, disp:it.disp, pz:1, kg:0 }];
-  });
   // Selects de la venta (cliente objeto / método / lista)
   const clientes = OPSd.clientes || [];
   const metodos = window.CG.config.payment || ["Efectivo","Tarjeta","Transferencia"];
@@ -142,10 +136,34 @@ function PosScreen({ ai }) {
   const [pago, setPago] = useState(metodos[0]);
   const [lista, setLista] = useState(listas[0]);
   const [factura, setFactura] = useState(false);
+  // Precios del cliente seleccionado (productId → precio/kg). Vacío = usa precio base.
+  const [precioMap, setPrecioMap] = useState({});
+  const precioDe = (it)=> (it && precioMap[it.id] != null ? precioMap[it.id] : (it ? it.precio : 0));
+  const cargarPrecios = (c)=>{
+    if (!c || !c.id || typeof window.fetch !== "function") { setPrecioMap({}); return; }
+    window.fetch("/api/customer-prices?customerId=" + c.id)
+      .then(r=> r.ok ? r.json() : null)
+      .then(d=>{ const m={}; if (d && d.items) d.items.forEach(it=>{ if (it.kg != null) m[it.productId] = it.kg; }); setPrecioMap(m); })
+      .catch(()=>{});
+  };
+  const onSelectCli = (c)=>{ setCli(c); cargarPrecios(c); };
   const cycle = (arr, cur, set)=>{ const i=arr.indexOf(cur); set(arr[(i+1)%arr.length]); };
-  const cycleCli = ()=>{ if(!clientes.length) return; const i=clientes.findIndex(x=>x===cli); setCli(clientes[(i+1)%clientes.length]); };
-  // Precarga de cliente desde "Nuevo pedido" en Clientes
-  useEffect(()=>{ if(window.__cgPosClient){ setCli(window.__cgPosClient); window.__cgPosClient = null; } }, []);
+
+  // Agregar al carrito — conserva id y usa el precio resuelto del cliente
+  const addItem = (it)=> setCart(c=>{
+    const i = c.findIndex(x=>x.n===it.n);
+    if (i>=0){ const n=[...c]; n[i]={ ...n[i], pz:n[i].pz+1 }; return n; }
+    return [...c, { id:it.id, n:it.n, precio:precioDe(it), disp:it.disp, pz:1, kg:0 }];
+  });
+
+  // Precarga de cliente (desde Clientes) + carga inicial de precios
+  useEffect(()=>{
+    let c = cli;
+    if (window.__cgPosClient){ c = window.__cgPosClient; setCli(c); window.__cgPosClient = null; }
+    if (c && c.id) cargarPrecios(c);
+  }, []);
+  // Re-precia el carrito cuando cambian los precios del cliente
+  useEffect(()=>{ setCart(c=>c.map(it=> precioMap[it.id] != null ? { ...it, precio:precioMap[it.id] } : it)); }, [precioMap]);
   const crearPedido = ()=>{
     if (!cart.length) return;
     if (cli && cli.id && window.CG.write) {
@@ -172,7 +190,7 @@ function PosScreen({ ai }) {
             <Overline style={{ marginBottom:12 }}>Detalles de la venta</Overline>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10 }}>
               <PosSelect icon="user" label={cli ? cli.nombre : "Selecciona cliente"}
-                options={clientes.map(c=>({ label:c.nombre, value:c }))} onSelect={setCli} />
+                options={clientes.map(c=>({ label:c.nombre, value:c }))} onSelect={onSelectCli} />
               <PosSelect icon="wallet" label={pago} options={metodos} onSelect={setPago} />
               <PosSelect icon="tag" label={lista} options={listas} onSelect={setLista} />
             </div>
@@ -193,7 +211,7 @@ function PosScreen({ ai }) {
                       <span style={{ font:`700 13.5px/1.15 ${Fy.ui}`, color:Cy.ink }}>{it.n}</span>
                       <Icon name="plus" size={16} color={Cy.red} />
                     </div>
-                    <div style={{ font:`700 15px/1 ${Fy.mono}`, color:Cy.ink, marginTop:8 }}>{mnyD(it.precio)}<span style={{ font:`500 11px/1 ${Fy.ui}`, color:Cy.inkFaint }}>/kg</span></div>
+                    <div style={{ font:`700 15px/1 ${Fy.mono}`, color:Cy.ink, marginTop:8 }}>{mnyD(precioDe(it))}<span style={{ font:`500 11px/1 ${Fy.ui}`, color:Cy.inkFaint }}>/kg</span></div>
                     <div style={{ marginTop:9 }}><Badge tone={d.tone} icon={d.icon}>{d.label}</Badge></div>
                   </button>
                 );

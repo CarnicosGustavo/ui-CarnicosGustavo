@@ -59,7 +59,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## POS
 - ✅ **Crear pedido** persiste · ✅ dropdowns (cliente/método/lista) selección libre
-- 🔧 **precio** usa base, no resuelve por cliente/lista (`customerPrices`/lista)
+- ✅ **precio por cliente**: al elegir cliente carga sus precios (`/api/customer-prices`) y re-precia carrito + catálogo
 - 🔧 **disponibilidad** del catálogo es aproximada (no usa `availabilityMap` con derivable)
 
 ## Recetas / Configurador
