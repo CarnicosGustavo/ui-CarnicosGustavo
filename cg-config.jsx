@@ -30,10 +30,10 @@ function ConfigScreen({ ai, go }) {
 
       {/* Zonas peligrosas (de la pantalla real) */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))", gap:13 }}>
-        <DangerCard tone="red" icon="rotate-ccw" title="Reset de Inventario"
+        <DangerCard tone="red" icon="rotate-ccw" title="Reset de Inventario" op="reset.stock"
           desc="Pone en cero el stock de todos los productos y registra auditoría (RESET). Requiere contraseña de administrador."
           cta="Resetear inventario" />
-        <DangerCard tone="amber" icon="users" title="Reset de Clientes y Pedidos"
+        <DangerCard tone="amber" icon="users" title="Reset de Clientes y Pedidos" op="reset.customers"
           desc="Borra clientes, pedidos, cobranza y precios por cliente. Genera respaldo en la base de datos antes de borrar."
           cta="Resetear clientes y pedidos" />
       </div>
@@ -44,12 +44,22 @@ const CONFIG_DESC = {
   productos:"Catálogo, tipos y stock", recetas:"Despiece y rendimiento", precios:"Listas por cliente",
   cold:"Fresco vs. frío", caja:"Ingresos y egresos", payment:"Formas de cobro",
 };
-function DangerCard({ tone, icon, title, desc, cta }) {
+function DangerCard({ tone, icon, title, desc, cta, op }) {
   const fg = tone==="red"?Cc.red:Cc.amber, bg = tone==="red"?Cc.redWash:Cc.amberWash;
   const [pw, setPw] = useState("");
   const [conf, setConf] = useState("");
   const [done, setDone] = useState(false);
   const ready = pw.length>0 && conf.trim().toUpperCase()==="RESET";
+  const ejecutar = ()=>{
+    if(!ready) return;
+    if(op && window.CG.write){
+      window.CG.write(op, { adminPassword:pw, confirm:"RESET" }).then(function(r){
+        if(r && r.ok){ if(window.CG.refresh) window.CG.refresh(); }
+        else if(r && r.error){ window.alert("No se pudo: "+r.error); }
+      });
+    }
+    setDone(true); setPw(""); setConf(""); setTimeout(()=>setDone(false), 2500);
+  };
   return (
     <div style={{ borderRadius:16, padding:18, background:bg, border:`1px solid ${fg}33` }}>
       <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:8 }}>
@@ -61,7 +71,7 @@ function DangerCard({ tone, icon, title, desc, cta }) {
         <input type="password" placeholder="Contraseña admin" value={pw} onChange={e=>setPw(e.target.value)} style={inputCfg} />
         <input placeholder='Escribe "RESET"' value={conf} onChange={e=>setConf(e.target.value)} style={inputCfg} />
       </div>
-      <button disabled={!ready} onClick={()=>{ if(ready){ setDone(true); setPw(""); setConf(""); setTimeout(()=>setDone(false), 2500); } }}
+      <button disabled={!ready} onClick={ejecutar}
         style={{ font:`700 13px/1 ${Fc.ui}`, color:"#fff", background:fg, border:"none",
         padding:"11px 16px", borderRadius:10, cursor: ready?"pointer":"not-allowed", opacity: ready?1:0.55 }}>
         {done ? "✓ Hecho" : cta}</button>

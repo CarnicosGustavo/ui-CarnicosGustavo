@@ -227,6 +227,7 @@ export default async function handler(req, res) {
 	const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 	const ok = (data) => res.status(200).json({ ok: true, ...data });
 	const fail = (msg, code = 400) => res.status(code).json({ error: msg });
+	const scopedW = (q) => (USER_UID ? q.eq("user_uid", USER_UID) : q.gte("id", 0));
 
 	try {
 		switch (op) {
@@ -249,6 +250,83 @@ export default async function handler(req, res) {
 				}).select("id").single();
 				if (error) throw error;
 				return ok({ id: data.id });
+			}
+
+			// edición/eliminación de cargos y abonos (montos en PESOS)
+			case "charge.update": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.amount !== undefined) patch.amount = Number(p.amount).toFixed(2);
+				if (p.concept !== undefined) patch.concept = p.concept;
+				if (p.date !== undefined) patch.charge_date = p.date;
+				const { error } = await db.from("credit_charges").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "charge.delete": {
+				if (!p.id) return fail("id requerido");
+				const { error } = await db.from("credit_charges").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "payment.updateAmount": {
+				if (!p.id) return fail("id requerido");
+				const patch = {};
+				if (p.amount !== undefined) patch.amount = Number(p.amount).toFixed(2);
+				if (p.method !== undefined) patch.method = p.method;
+				if (p.date !== undefined) patch.payment_date = p.date;
+				if (p.notes !== undefined) patch.notes = p.notes;
+				const { error } = await db.from("credit_payments").update(patch).eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "payment.deleteAbono": {
+				if (!p.id) return fail("id requerido");
+				const { error } = await db.from("credit_payments").delete().eq("id", p.id);
+				if (error) throw error;
+				return ok({});
+			}
+			case "account.set": {
+				if (!p.customerId) return fail("customerId requerido");
+				const row = { customer_id: p.customerId, credit_limit: Number(p.creditLimit || 0).toFixed(2), terms_days: Math.round(Number(p.termsDays) || 0) };
+				const { data: ex } = await db.from("credit_accounts").select("id").eq("customer_id", p.customerId).limit(1);
+				if (ex && ex[0]) await db.from("credit_accounts").update({ ...row, updated_at: new Date().toISOString() }).eq("id", ex[0].id);
+				else await db.from("credit_accounts").insert(row);
+				return ok({});
+			}
+
+			// ---------- RESETS (zona de peligro; requieren confirm "RESET") ----------
+			case "reset.stock": {
+				if (p.confirm !== "RESET") return fail("confirmación 'RESET' requerida");
+				const adminPw = process.env.ADMIN_RESET_PASSWORD || process.env.SEED_TOKEN || "";
+				if (adminPw && p.adminPassword !== adminPw) return fail("contraseña de administrador inválida", 401);
+				const { data: prods } = await scopedW(db.from("products").select("id"));
+				const { error } = await scopedW(db.from("products").update({
+					stock_pieces: 0, weighed_pieces: 0, stock_kg: "0.000",
+					stock_pieces_frozen: 0, stock_kg_frozen: "0.000",
+				}));
+				if (error) throw error;
+				return ok({ productsReset: (prods || []).length });
+			}
+			case "reset.customers": {
+				if (p.confirm !== "RESET") return fail("confirmación 'RESET' requerida");
+				const adminPw = process.env.ADMIN_RESET_PASSWORD || process.env.SEED_TOKEN || "";
+				if (adminPw && p.adminPassword !== adminPw) return fail("contraseña de administrador inválida", 401);
+				const { data: custs } = await scopedW(db.from("customers").select("id"));
+				const cids = (custs || []).map((c) => c.id);
+				const { data: ords } = await scopedW(db.from("orders").select("id"));
+				const oids = (ords || []).map((o) => o.id);
+				if (oids.length) await db.from("order_items").delete().in("order_id", oids);
+				if (cids.length) {
+					await db.from("credit_payments").delete().in("customer_id", cids);
+					await db.from("credit_charges").delete().in("customer_id", cids);
+					await db.from("customer_prices").delete().in("customer_id", cids);
+					await db.from("credit_accounts").delete().in("customer_id", cids);
+				}
+				if (oids.length) await db.from("orders").delete().in("id", oids);
+				if (cids.length) await db.from("customers").delete().in("id", cids);
+				await scopedW(db.from("transactions").delete());
+				return ok({ deletedCustomers: cids.length, deletedOrders: oids.length });
 			}
 
 			// ---------- CLIENTES ----------

@@ -57,8 +57,12 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   del día con ids reales para mapear proveedores↔filas y persistir (hoy usa estado local)
 
 ## Cobranza
-- ✅ **Abonar** persiste → `abono` · ✅ **Estado de cuenta** (modal) · ✅ WhatsApp
+- ✅ **Abonar** persiste → `abono` · ✅ WhatsApp
+- ✅ **Estado de cuenta** (modal) ahora con **ledger real** (`/api/statement`): lista de
+  cargos/abonos por fecha + totales
 - ✅ **Capturar ticket viejo** (modal cliente/monto/concepto) → `cargo`
+- ✅ ops backend de edición: `charge.update/delete`, `payment.updateAmount/deleteAbono`,
+  `account.set` (límite/plazo) — listas para cablear controles de edición
 - 🔧 "Ver pedidos a crédito" → Pedidos sin filtrar por cliente
 
 ## Clientes (lista + detalle)
@@ -101,7 +105,9 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Configuración (hub)
 - ✅ accesos navegan · ✅ DangerCards validan pw+"RESET"
-- ⏳ **Reset** no ejecuta → `inventory.resetAllStock/resetCustomersAndOrders`
+- ✅ **Reset** ejecuta → `reset.stock` (pone stock en cero) y `reset.customers`
+  (borra clientes/pedidos/cobranza/precios + transacciones); requiere `confirm:"RESET"`
+  y, si `ADMIN_RESET_PASSWORD` está en env, contraseña válida
 
 ## Perfil
 - ✅ tema (claro/oscuro), cerrar sesión (local), prompts email/pass

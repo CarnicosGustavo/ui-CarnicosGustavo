@@ -273,6 +273,15 @@ function CobranzaScreen({ ai }) {
   const [abono, setAbono] = useState(null);   // cliente {nombre,saldo} o null
   const [estado, setEstado] = useState(null); // estado de cuenta de un cliente
   const [cargo, setCargo] = useState(null);   // captura de ticket viejo o null
+  const [ledger, setLedger] = useState(null); // detalle (cargos/abonos) del estado de cuenta
+  useEffect(()=>{
+    if(!estado || !estado.id){ setLedger(null); return; }
+    setLedger(undefined); // cargando
+    fetch("/api/statement?customerId="+estado.id)
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){ setLedger(d && Array.isArray(d.ledger) ? d : null); })
+      .catch(function(){ setLedger(null); });
+  }, [estado]);
   const goTo = (m)=> window.__cgGo && window.__cgGo(m);
   const waRecordatorio = (c)=> window.open(
     "https://wa.me/?text=" + encodeURIComponent(
@@ -363,6 +372,25 @@ function CobranzaScreen({ ai }) {
             <div style={{ marginTop:10, font:`500 11.5px/1.4 ${Fx.ui}`, color:Cx.inkFaint }}>
               Antigüedad del saldo: {estado.dias} días.
             </div>
+            {ledger===undefined && <div style={{ marginTop:12, font:`500 12px/1 ${Fx.ui}`, color:Cx.inkFaint }}>Cargando movimientos…</div>}
+            {ledger && ledger.ledger && ledger.ledger.length>0 && (
+              <div style={{ marginTop:12 }}>
+                <div style={{ font:`700 11px/1 ${Fx.ui}`, letterSpacing:"0.05em", textTransform:"uppercase", color:Cx.inkFaint, marginBottom:6 }}>Movimientos</div>
+                <div style={{ maxHeight:220, overflowY:"auto", display:"flex", flexDirection:"column", gap:1 }}>
+                  {ledger.ledger.map(function(m){ return (
+                    <div key={m.tipo+"-"+m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 2px", borderTop:`1px solid ${Cx.lineSoft}` }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ font:`600 12.5px/1.2 ${Fx.ui}`, color:Cx.ink, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.concepto}</div>
+                        <div style={{ font:`500 10.5px/1 ${Fx.mono}`, color:Cx.inkFaint, marginTop:3 }}>{m.fecha||""}</div>
+                      </div>
+                      <span style={{ font:`700 13px/1 ${Fx.mono}`, color: m.tipo==="abono"?Cx.green:Cx.ink80, flexShrink:0, marginLeft:10 }}>
+                        {m.tipo==="abono" ? "−"+mny(m.abono) : mny(m.cargo)}
+                      </span>
+                    </div>
+                  ); })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>
