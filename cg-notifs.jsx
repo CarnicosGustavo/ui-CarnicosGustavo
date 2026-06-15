@@ -97,6 +97,11 @@ function NotifBell() {
               <span style={{ font: "700 14px/1 " + Fnf.ui, color: Cnf.ink }}>Notificaciones</span>
               {notifs.length > 0 && <button onClick={marcarTodo} style={{ font: "600 11.5px/1 " + Fnf.ui, color: Cnf.red, background: "transparent", border: "none", cursor: "pointer" }}>Marcar leídas</button>}
             </div>
+            <button onClick={function () { setOpen(false); if (window.__cgGo) window.__cgGo("pendientes"); }}
+              style={{ width: "100%", textAlign: "left", padding: "10px 15px", borderBottom: "1px solid " + (Cnf.lineSoft || Cnf.line),
+                font: "700 12px/1 " + Fnf.ui, color: Cnf.red, background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
+              <Icon name="list-checks" size={14} color={Cnf.red} /> Ver pendientes y autorizaciones
+            </button>
             {notifs.length === 0 ? (
               <div style={{ padding: "28px 16px", textAlign: "center", color: Cnf.inkFaint || Cnf.inkSoft, font: "500 13px/1.4 " + Fnf.ui }}>
                 <div style={{ fontSize: 26, marginBottom: 6 }}>✓</div>Todo al día. Sin avisos.

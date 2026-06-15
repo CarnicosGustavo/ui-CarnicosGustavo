@@ -21,11 +21,25 @@ window.CG.requirePin = function (kind, onOk, opts) {
   window.CG._pinReq = { kind: kind, onOk: onOk, opts: opts || {} };
   window.dispatchEvent(new Event("cg:pin"));
 };
+// Bitácora de autorizaciones (auditoría local de acciones sensibles aprobadas).
+window.CG.authLog = function () { try { return JSON.parse(localStorage.getItem("cg_authlog") || "[]"); } catch (e) { return []; } };
+window.CG.logAuth = function (action) {
+  try {
+    var scr = window.__cgScreen || "";
+    if (window.CG.labelOf && scr) scr = window.CG.labelOf(scr) || scr;
+    var l = window.CG.authLog();
+    l.unshift({ id: "a" + Date.now(), action: action || "Acción autorizada", screen: scr, ts: new Date().toISOString() });
+    localStorage.setItem("cg_authlog", JSON.stringify(l.slice(0, 200)));
+    window.dispatchEvent(new Event("cg:authlog"));
+  } catch (e) {}
+};
+
 // Autoriza una acción sensible / no reversible con el PIN de privacidad (= PIN de autorización).
 // Uso: CG.requireAuth(() => { ...acción... }, "¿Eliminar el pedido #123?")
 window.CG.requireAuth = function (onOk, msg) {
-  if (window.CG.requirePin) window.CG.requirePin("privacy", onOk, { msg: msg || "Confirma con tu PIN para autorizar esta acción", auth: true });
-  else onOk && onOk();
+  var wrapped = function () { window.CG.logAuth(msg); if (onOk) onOk(); };
+  if (window.CG.requirePin) window.CG.requirePin("privacy", wrapped, { msg: msg || "Confirma con tu PIN para autorizar esta acción", auth: true });
+  else wrapped();
 };
 
 const PIN_LABEL = { privacy: "PIN de privacidad", cedis: "Código de verificación CEDIS", frio: "Código del área de Frío" };

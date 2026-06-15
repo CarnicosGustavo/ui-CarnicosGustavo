@@ -315,6 +315,7 @@ function App() {
     config:   <ConfigScreen ai={ai} go={go} />,
     settings: <ConfigScreen ai={ai} go={go} />,
     seguridad: <SeguridadScreen ai={ai} />,
+    pendientes: <AgentePendientesScreen ai={ai} />,
     perfil:   <ProfileScreen ai={ai} />,
   };
   const content = screens[current] || <PlaceholderScreen id={current} ai={ai} />;

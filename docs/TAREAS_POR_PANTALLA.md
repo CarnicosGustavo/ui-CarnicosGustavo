@@ -26,6 +26,10 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 - ✅ Campana del header consume avisos **reales** (`/api/notifications`) con fallback a
   derivados de `CG.ops`; `NotificationCenter` (config-antonella) también cableado al real.
 - ⏳ **Dashboard de Configuración** ("tipo tweaks") — plan en `docs/PLAN_CONFIG_DASHBOARD.md`
+- ✅ **Centro "Pendientes y Autorizaciones"** (`cg-agente.jsx`, ruta `pendientes`): tareas
+  pendientes (avisos reales + fallback) + **bitácora de autorizaciones** (`CG.authLog`,
+  cada acción aprobada con PIN queda registrada) + resumen de iAntonella. Acceso desde la
+  campana ("Ver pendientes y autorizaciones").
 
 ## Panel
 - ✅ Lectura (KPIs, categorías, flujo) · ✅ ocultar/mostrar montos
