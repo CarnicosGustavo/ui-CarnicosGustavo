@@ -99,7 +99,15 @@ function BasculaScreen({ ai }) {
   const g = parseFloat(bruto)||0;
   const neto = Math.max(0, g - tara);
   const goTo = (m)=> window.__cgGo && window.__cgGo(m);
-  const registrar = ()=>{ setBruto(""); if (idx>=b.item.total) goTo("cobro"); else setIdx(i=>i+1); };
+  const registrar = ()=>{
+    const cur = (b.items && b.items[idx-1]) || null;
+    if (cur && cur.orderItemId && neto > 0 && window.CG.write) {
+      window.CG.write("order.weighItem", { orderItemId: cur.orderItemId, kg: neto })
+        .then(function(r){ if (r && r.ok && window.CG.refresh) window.CG.refresh(); });
+    }
+    setBruto("");
+    if (idx >= b.item.total) goTo("cobro"); else setIdx(i=>i+1);
+  };
   return (
     <div>
       <ScreenHead title="Báscula" desc="Estación de pesaje. Pensada para tablet y dedos: número gigante, recipientes con un toque, Enter registra."
@@ -222,6 +230,15 @@ function CobroScreen({ ai }) {
     const i = ps.indexOf(metodo); setMetodo(ps[(i+1)%ps.length]); };
   const linea = c.pedido.lineas[0];
   const total = linea.kg * precio;
+  const cobrar = ()=>{
+    if (!(total > 0)) return;
+    const lineas = c.pedido.lineas || [];
+    if (c.pedido.id && window.CG.write) {
+      const items = lineas.map((ln, i)=>({ orderItemId: ln.orderItemId, productId: ln.productId, pricePerKg: i===0 ? precio : ln.precio }));
+      window.CG.write("order.priceAndCharge", { orderId: c.pedido.id, paymentType: modo, items })
+        .then(function(r){ if (r && r.ok && window.CG.refresh) window.CG.refresh(); window.__cgGo && window.__cgGo("pedidos"); });
+    } else { window.__cgGo && window.__cgGo("pedidos"); }
+  };
   return (
     <div>
       <ScreenHead title="Cobro" desc="Cola de cobro: pedidos ya pesados, listos para cobrar de contado o a crédito." />
@@ -288,7 +305,7 @@ function CobroScreen({ ai }) {
             <Icon name="chevron-down" size={16} color={Cb.inkFaint} style={{ marginLeft:"auto" }} />
           </div>
           <Btn kind={total>0?"green":"outline"} size="xl" block icon="receipt-text"
-            onClick={ total>0 ? ()=>window.__cgGo&&window.__cgGo("pedidos") : undefined }
+            onClick={ total>0 ? cobrar : undefined }
             style={ total>0?{}:{ background:Cb.paper2, color:Cb.inkFaint, cursor:"not-allowed" } }>
             Cobrar {money(total)}
           </Btn>

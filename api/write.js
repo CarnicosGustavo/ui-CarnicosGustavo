@@ -225,6 +225,59 @@ export default async function handler(req, res) {
 				return ok({ id: ord.id, status: needWeigh ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO" });
 			}
 
+			// ---------- BÁSCULA: registrar peso de un artículo ----------
+			case "order.weighItem": {
+				if (!p.orderItemId || !(Number(p.kg) > 0)) return fail("orderItemId y kg>0 requeridos");
+				const { data: it, error: e1 } = await db.from("order_items")
+					.select("order_id, unit_price").eq("id", p.orderItemId).single();
+				if (e1) throw e1;
+				const grams = Math.round(Number(p.kg) * 1000);
+				const subtotal = Math.round(Number(it.unit_price || 0) * Number(p.kg)); // centavos
+				const { error: e2 } = await db.from("order_items")
+					.update({ quantity_kg: grams, subtotal, status: "COMPLETADO" }).eq("id", p.orderItemId);
+				if (e2) throw e2;
+				// recalcular total + estado del pedido
+				const { data: items } = await db.from("order_items").select("subtotal, status").eq("order_id", it.order_id);
+				const total = (items || []).reduce((s, r) => s + Number(r.subtotal || 0), 0);
+				const pend = (items || []).some((r) => r.status === "PENDIENTE_PESAJE");
+				await db.from("orders").update({
+					total_amount: total, status: pend ? "PENDIENTE_PESAJE" : "LISTA_PARA_COBRO", requires_weighing: pend,
+				}).eq("id", it.order_id);
+				return ok({ orderId: it.order_id, done: !pend });
+			}
+
+			// ---------- COBRO: fijar precios y cobrar ----------
+			// Versión segura: aplica precios, marca COMPLETADA y crea transacción
+			// (contado) o cargo a crédito. NO descuenta inventario (a validar).
+			case "order.priceAndCharge": {
+				if (!p.orderId || !Array.isArray(p.items) || !p.items.length)
+					return fail("orderId e items[] requeridos");
+				let total = 0;
+				for (const it of p.items) {
+					const { data: oi } = await db.from("order_items")
+						.select("quantity_kg, quantity_pieces").eq("id", it.orderItemId).single();
+					const kg = oi?.quantity_kg ? Number(oi.quantity_kg) / 1000 : 0;
+					const unit = Math.round(Number(it.pricePerKg || 0) * 100); // centavos por kg/pza
+					const sub = kg > 0 ? Math.round(unit * kg) : unit * (oi?.quantity_pieces || 0);
+					total += sub;
+					await db.from("order_items").update({ unit_price: unit, subtotal: sub, status: "COMPLETADO" }).eq("id", it.orderItemId);
+				}
+				await db.from("orders").update({ total_amount: total, status: "COMPLETADA" }).eq("id", p.orderId);
+				const { data: ord } = await db.from("orders").select("customer_id").eq("id", p.orderId).single();
+				if (p.paymentType === "credito") {
+					if (ord?.customer_id) await db.from("credit_charges").insert({
+						customer_id: ord.customer_id, amount: (total / 100).toFixed(2),
+						concept: `Pedido #${p.orderId}`, source: "pedido", order_id: p.orderId, charge_date: today(),
+					});
+				} else {
+					await db.from("transactions").insert({
+						description: `Cobro pedido #${p.orderId}`, amount: total, type: "income",
+						category: "Ventas", status: "completed", user_uid: USER_UID, order_id: p.orderId,
+					});
+				}
+				return ok({ orderId: p.orderId, total });
+			}
+
 			default:
 				return fail(`Operación desconocida: ${op}`, 400);
 		}

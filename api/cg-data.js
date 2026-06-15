@@ -254,11 +254,14 @@ export default async function handler(req, res) {
 			.in("status", ["PENDIENTE_PESAJE", "PARCIAL_DISPONIBLE"]).order("id").limit(1);
 		const o = pend && pend[0];
 		if (o) {
-			const { data: its } = await db.from("order_items").select("product_name, products(category)").eq("order_id", o.id);
-			const first = its && its[0];
+			const { data: its } = await db.from("order_items")
+				.select("id, product_name, quantity_kg, products(category)").eq("order_id", o.id);
+			const list = its || [];
+			const first = list[0];
 			out.data.bascula = {
 				pedido: { id: o.id, cliente: o.customers?.name || `#${o.id}`, total: c2p(o.total_amount) },
-				item: { nombre: first?.product_name || "—", cat: first?.products?.category || "—", idx: 1, total: (its || []).length || 1 },
+				item: { nombre: first?.product_name || "—", cat: first?.products?.category || "—", idx: 1, total: list.length || 1 },
+				items: list.map((it) => ({ orderItemId: it.id, nombre: it.product_name, cat: it.products?.category || "—", solicitadoKg: num(it.quantity_kg) / 1000 })),
 			};
 		}
 	} catch (e) { console.error("data.bascula", e?.message); }
@@ -268,12 +271,16 @@ export default async function handler(req, res) {
 			.in("status", ["LISTA_PARA_COBRO", "PROCESANDO_PAGO"]).order("id").limit(10);
 		if (cobro?.length) {
 			const first = cobro[0];
-			const { data: its } = await db.from("order_items").select("product_name, quantity_kg, unit_price").eq("order_id", first.id);
+			const { data: its } = await db.from("order_items")
+				.select("id, product_id, product_name, quantity_kg, unit_price").eq("order_id", first.id);
 			out.data.cobro = {
 				cola: cobro.map((o) => ({ id: o.id, cliente: o.customers?.name || `#${o.id}`, items: 0 })),
 				pedido: {
 					id: first.id, cliente: first.customers?.name || `#${first.id}`,
-					lineas: (its || []).map((it) => ({ producto: it.product_name, kg: num(it.quantity_kg), precio: c2p(it.unit_price) })),
+					lineas: (its || []).map((it) => ({
+						orderItemId: it.id, productId: it.product_id, producto: it.product_name,
+						kg: num(it.quantity_kg) / 1000, precio: c2p(it.unit_price),
+					})),
 				},
 			};
 		}
