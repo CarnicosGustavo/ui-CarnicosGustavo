@@ -29,8 +29,8 @@ function PanelScreen({ ai }) {
       <div style={{ display:"flex", alignItems:"center", gap:22, flexWrap:"wrap",
         background:Cs.cream, border:`1px solid ${Cs.line}`, borderRadius:20,
         padding:"16px 24px", marginBottom:18, boxShadow:Cs.shadow }}>
-        <img src="assets/logo-principal.png" alt="Cárnicos Gustavo"
-          style={{ height:132, width:"auto", display:"block", flexShrink:0 }} />
+        <img src="assets/logo-gustavo.png" alt="Cárnicos Gustavo"
+          style={{ height:138, width:"auto", display:"block", flexShrink:0 }} />
         <div style={{ flex:1, minWidth:220 }}>
           <div style={{ font:`700 11px/1 ${Fs.ui}`, letterSpacing:"0.22em", textTransform:"uppercase",
             color:"#9E3326", marginBottom:9 }}>Centro de Distribución</div>

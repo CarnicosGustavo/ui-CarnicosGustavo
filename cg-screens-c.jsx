@@ -269,6 +269,7 @@ function ClientesScreen({ ai }) {
 /* ---------------- COBRANZA ---------------- */
 function CobranzaScreen({ ai }) {
   const [abono, setAbono] = useState(null);   // cliente {nombre,saldo} o null
+  const [estado, setEstado] = useState(null); // estado de cuenta de un cliente
   const goTo = (m)=> window.__cgGo && window.__cgGo(m);
   const waRecordatorio = (c)=> window.open(
     "https://wa.me/?text=" + encodeURIComponent(
@@ -320,7 +321,7 @@ function CobranzaScreen({ ai }) {
                           onClick={()=>setAbono({ id:c.id, nombre:c.cliente, saldo:c.saldo })}>Abonar</Btn>
                         <Kebab items={[
                           { label:"Registrar abono", icon:"banknote", onClick:()=>setAbono({ id:c.id, nombre:c.cliente, saldo:c.saldo }) },
-                          { label:"Estado de cuenta", icon:"file-text", onClick:()=>goTo("pedidos") },
+                          { label:"Estado de cuenta", icon:"file-text", onClick:()=>setEstado(c) },
                           { label:"Recordatorio WhatsApp", icon:"message-circle", onClick:()=>waRecordatorio(c) },
                           { label:"Ver pedidos a crédito", icon:"receipt-text", onClick:()=>goTo("pedidos") },
                         ]} />
@@ -341,6 +342,27 @@ function CobranzaScreen({ ai }) {
           }
           setAbono(null);
         }} />
+      <Modal open={!!estado} onClose={()=>setEstado(null)} icon="file-text" title="Estado de cuenta"
+        width={460} subtitle={estado ? `Cliente: ${estado.cliente}` : ""}
+        footer={<>
+          <Btn kind="outline" onClick={()=>setEstado(null)}>Cerrar</Btn>
+          <Btn kind="green" icon="banknote" onClick={()=>{ const c=estado; setEstado(null); setAbono({ id:c.id, nombre:c.cliente, saldo:c.saldo }); }}>Abonar</Btn>
+        </>}>
+        {estado && (
+          <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+            {[["Cargos", estado.cargos, Cx.ink80],["Abonos", estado.abonos, Cx.green],["Saldo pendiente", estado.saldo, Cx.red]].map(([k,v,col],i)=>(
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"11px 2px",
+                borderTop: i>0?`1px solid ${Cx.lineSoft}`:"none" }}>
+                <span style={{ font:`600 13px/1 ${Fx.ui}`, color:Cx.inkSoft }}>{k}</span>
+                <span style={{ font:`700 15px/1 ${Fx.mono}`, color:col }}>{mny(v)}</span>
+              </div>
+            ))}
+            <div style={{ marginTop:10, font:`500 11.5px/1.4 ${Fx.ui}`, color:Cx.inkFaint }}>
+              Antigüedad del saldo: {estado.dias} días.
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

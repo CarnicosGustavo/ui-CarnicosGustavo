@@ -49,6 +49,18 @@
     padding: 7px 10px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .14s ease, transform .14s ease; z-index: 60; }
   .cg-rail-item:hover .cg-rail-label { opacity: 1; transform: translateY(-50%) scale(1); }
 
+  /* Ramón — ícono-indicador del header (máscara recoloreable por background-color) */
+  .cg-ramon { -webkit-mask-image:url(/assets/ramon-mask.png); mask-image:url(/assets/ramon-mask.png);
+    -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+    -webkit-mask-position:center; mask-position:center;
+    -webkit-mask-size:contain; mask-size:contain;
+    transition: background-color .45s ease, filter .45s ease; }
+  .cg-ramon-order { animation: cgRamonOrder 1.3s ease-in-out infinite; }
+  @keyframes cgRamonOrder {
+    0%,100% { filter: drop-shadow(0 0 0 transparent); transform: translateY(0); }
+    50%     { filter: drop-shadow(0 1px 7px currentColor); transform: translateY(-1.5px); } }
+  @media (prefers-reduced-motion: reduce) { .cg-ramon-order { animation: none; } }
+
   /* responsive */
   @media (max-width: 600px) { .cg-hide-sm { display: none !important; } }
   @media (max-width: 880px) {

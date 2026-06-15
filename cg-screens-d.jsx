@@ -151,7 +151,7 @@ function PosScreen({ ai }) {
         kg:it.kg||0, price:it.precio, byWeight: it.disp==="pesaje" }));
       window.CG.write("order.create", { customerId:cli.id, items })
         .then(function(r){
-          if (r && r.ok && window.CG.refresh) window.CG.refresh();
+          if (r && r.ok) { if (window.CG.refresh) window.CG.refresh(); if (window.CG.ramonPedido) window.CG.ramonPedido(); }
           window.__cgGo && window.__cgGo(needWeigh ? "bascula" : "cobro");
         });
     } else {
@@ -169,9 +169,10 @@ function PosScreen({ ai }) {
           <Card>
             <Overline style={{ marginBottom:12 }}>Detalles de la venta</Overline>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:10 }}>
-              <PosSelect icon="user" label={cli ? cli.nombre : "Cliente"} onClick={cycleCli} />
-              <PosSelect icon="wallet" label={pago} onClick={()=>cycle(metodos, pago, setPago)} />
-              <PosSelect icon="tag" label={lista} onClick={()=>cycle(listas, lista, setLista)} />
+              <PosSelect icon="user" label={cli ? cli.nombre : "Selecciona cliente"}
+                options={clientes.map(c=>({ label:c.nombre, value:c }))} onSelect={setCli} />
+              <PosSelect icon="wallet" label={pago} options={metodos} onSelect={setPago} />
+              <PosSelect icon="tag" label={lista} options={listas} onSelect={setLista} />
             </div>
           </Card>
           <Card pad={0} style={{ overflow:"hidden" }}>
@@ -262,13 +263,34 @@ function PosScreen({ ai }) {
   );
 }
 const posStep = { width:30, height:34, border:"none", background:Cy.paper2, cursor:"pointer", font:`700 16px/1 ${Fy.ui}`, color:Cy.ink };
-function PosSelect({ icon, label, onClick }) {
+function PosSelect({ icon, label, options, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const lbl = (o) => (o && o.label !== undefined ? o.label : o);
+  const val = (o) => (o && o.value !== undefined ? o.value : o);
   return (
-    <div onClick={onClick} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cy.line}`, borderRadius:10,
-      padding:"12px 13px", background:Cy.paper2, cursor:"pointer" }}>
-      <Icon name={icon} size={16} color={Cy.inkSoft} />
-      <span style={{ flex:1, font:`700 13.5px/1 ${Fy.ui}`, color:Cy.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>
-      <Icon name="chevrons-up-down" size={15} color={Cy.inkFaint} />
+    <div style={{ position:"relative" }}>
+      <div onClick={()=>setOpen(o=>!o)} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${open?Cy.red:Cy.line}`, borderRadius:10,
+        padding:"12px 13px", background:Cy.paper2, cursor:"pointer" }}>
+        <Icon name={icon} size={16} color={Cy.inkSoft} />
+        <span style={{ flex:1, font:`700 13.5px/1 ${Fy.ui}`, color:Cy.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</span>
+        <Icon name="chevron-down" size={15} color={Cy.inkFaint} />
+      </div>
+      {open && (
+        <>
+          <div onClick={()=>setOpen(false)} style={{ position:"fixed", inset:0, zIndex:40 }} />
+          <div style={{ position:"absolute", top:"calc(100% + 6px)", left:0, right:0, zIndex:50, background:Cy.paper,
+            border:`1px solid ${Cy.line}`, borderRadius:11, boxShadow:Cy.shadow, maxHeight:260, overflowY:"auto", padding:5 }}>
+            {(options||[]).map((o,i)=>(
+              <button key={i} onClick={()=>{ onSelect && onSelect(val(o)); setOpen(false); }} className="cg-menu-item"
+                style={{ display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent", cursor:"pointer",
+                  font:`600 13.5px/1 ${Fy.ui}`, color:Cy.ink, padding:"10px 11px", borderRadius:8 }}>
+                {lbl(o)}
+              </button>
+            ))}
+            {(!options || !options.length) && <div style={{ padding:"10px 11px", font:`500 13px/1 ${Fy.ui}`, color:Cy.inkFaint }}>Sin opciones</div>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

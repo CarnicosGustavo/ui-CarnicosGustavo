@@ -33,7 +33,6 @@ function Rail({ current, go }) {
   return (
     <nav className="cg-rail" style={{ background:Ca.railBg, display:"flex", flexDirection:"column",
       alignItems:"center", gap:7, padding:"14px 9px", flexShrink:0 }}>
-      <div onClick={()=>go("panel")} style={{ cursor:"pointer", marginBottom:6 }}><PigBadge size={42} /></div>
       {op.map(Item)}
       <div style={{ width:24, height:1, background:Ca.railFgDim, opacity:0.3, margin:"5px 0" }} />
       {/* Engrane de Configuración con submenú */}
@@ -130,12 +129,46 @@ function ThemeControl({ palette, mode, setTheme }) {
   );
 }
 
+/* -------- Ramón: ícono-indicador del header (máscara recoloreable) -------- */
+const Ramon = window.CG.ramon || (window.CG.ramon = {
+  alert:false, _subs:new Set(),
+  setAlert(a){ if(this.alert!==a){ this.alert=a; this._subs.forEach(f=>f("state")); } },
+  ping(){ this._subs.forEach(f=>f("order")); },
+  sub(f){ this._subs.add(f); return ()=>this._subs.delete(f); },
+});
+window.CG.ramonPedido = () => Ramon.ping();   // pulso verde al entrar un pedido
+
+function RamonMark() {
+  const [alert, setAlert] = useState(Ramon.alert);
+  const [order, setOrder] = useState(false);
+  const tRef = useRef();
+  useEffect(() => Ramon.sub(kind => {
+    if (kind === "order") {
+      setOrder(true); clearTimeout(tRef.current);
+      tRef.current = setTimeout(() => setOrder(false), 2600);
+    } else setAlert(Ramon.alert);
+  }), []);
+  const color = order ? Ca.green : (alert ? Ca.red : Ca.ink);
+  const label = order ? "Pedido nuevo" : (alert ? "Avisos pendientes" : "Cárnicos Gustavo");
+  return (
+    <button onClick={() => window.__cgGo && window.__cgGo("panel")} title={"Ramón · " + label}
+      aria-label={"Ramón — " + label} style={{ border:"none", background:"transparent", padding:0,
+      cursor:"pointer", lineHeight:0, flexShrink:0 }}>
+      <span className={"cg-ramon" + (order ? " cg-ramon-order" : "")} style={{ display:"inline-block",
+        width:34, height:34, color, backgroundColor:color }} />
+    </button>
+  );
+}
+
 function TopBar({ current, theme }) {
   return (
     <header className="cg-top" style={{ height:60, flexShrink:0, background:Ca.paper,
       borderBottom:`1px solid ${Ca.line}`, display:"grid", gridTemplateColumns:"1fr auto 1fr",
       alignItems:"center", padding:"0 18px", position:"relative", zIndex:30 }}>
-      <div style={{ font:`400 20px/1 ${Fa.display}`, color:Ca.ink, letterSpacing:"0.02em" }}>{window.CG.labelOf(current)}</div>
+      <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+        <RamonMark />
+        <div style={{ font:`400 20px/1 ${Fa.display}`, color:Ca.ink, letterSpacing:"0.02em" }}>{window.CG.labelOf(current)}</div>
+      </div>
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", lineHeight:1 }}>
         <div style={{ font:`600 9px/1 ${Fa.ui}`, letterSpacing:"0.32em", color:Ca.red, marginBottom:3 }}>CÁRNICOS</div>
         <div style={{ font:`400 17px/1 ${Fa.display}`, color:Ca.ink, letterSpacing:"0.04em" }}>GUSTAVO</div>
