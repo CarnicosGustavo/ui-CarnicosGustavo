@@ -56,10 +56,10 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   pesos reales COMPLETADO del día; raíz=kg/canalTotal, sub=kg/padre) · con confirm + test
 
 ## CEDIS (módulo nuevo de diseño)
-- ✅ ops backend listas: `cedis.addSupplier`, `cedis.save` (verified_*/cedis_detail),
-  `purchase.recordSupplier` (stock + COMPRA)
-- ⏳ **cableado de pantalla** `cg-cedis.jsx` pendiente: necesita leer `channel_purchases`
-  del día con ids reales para mapear proveedores↔filas y persistir (hoy usa estado local)
+- ✅ ops backend: `cedis.addSupplier`, `cedis.save` (verified_*/cedis_detail), `purchase.recordSupplier`
+- ✅ **cableado**: lee `channel_purchases` del día con ids reales (`/api/cedis`), restaura
+  medias capturadas, **Guardar** → `cedis.save`, **Agregar proveedor** → `cedis.addSupplier`
+- ✅ **gate por código CEDIS** (PIN `cedis`, 1×sesión)
 
 ## Cobranza
 - ✅ **Abonar** persiste → `abono` · ✅ WhatsApp
@@ -101,6 +101,7 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Inventario Frío
 - ✅ **A frío / A fresco** con **diálogo de kg/piezas** → `cold.toFrozen/toFresh`
+- ✅ **gate por código de Frío** (PIN `frio`, 1×sesión)
 
 ## Caja
 - ✅ **Agregar** + **Eliminar** persisten · ✅ lee transacciones reales (`config.caja`) · ⏳ editar

@@ -2,9 +2,27 @@
    INVENTARIO FRÍO — Transferencia Fresco ↔ Frío con tickets
    ============================================================ */
 
-const { useState, useRef } = React;
+const { useState, useRef, useEffect } = React;
 
+// Compuerta por código del área de Frío (envuelve la pantalla; hooks consistentes).
 function ColdInventoryScreen({ ai }) {
+  const [unlocked, setUnlocked] = useState(()=> { try { return sessionStorage.getItem("cg_frio_ok")==="1"; } catch(e){ return false; } });
+  useEffect(()=>{ if(!unlocked && window.CG.requirePin) window.CG.requirePin("frio", ()=>{ try{ sessionStorage.setItem("cg_frio_ok","1"); }catch(e){} setUnlocked(true); }, { msg:"Código del área de Frío" }); }, [unlocked]);
+  if(!unlocked) return (
+    <div style={{ padding:"60px 22px", textAlign:"center", color:"#666" }}>
+      <div style={{ fontSize:34, marginBottom:10 }}>❄️🔒</div>
+      <h2 style={{ margin:"0 0 6px", fontSize:20 }}>Área de Frío protegida</h2>
+      <p style={{ margin:"0 0 16px", fontSize:13 }}>Ingresa el código del área para gestionar el inventario en frío.</p>
+      <button onClick={()=>window.CG.requirePin&&window.CG.requirePin("frio", ()=>{ try{ sessionStorage.setItem("cg_frio_ok","1"); }catch(e){} setUnlocked(true); }, { msg:"Código del área de Frío" })}
+        style={{ padding:"10px 18px", background:"#c41e3a", color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:13 }}>
+        Ingresar código
+      </button>
+    </div>
+  );
+  return <ColdInventoryScreenInner ai={ai} />;
+}
+
+function ColdInventoryScreenInner({ ai }) {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([
     { id:1, name:"JAMÓN", fresh:15.2, frozen:8.5, unit:"kg" },
