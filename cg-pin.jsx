@@ -135,7 +135,7 @@ function SeguridadScreen({ ai }) {
     const v = (vals[kind]||"").trim();
     if(!/^\d{4}$/.test(v)){ window.alert("El PIN debe ser de 4 dígitos."); return; }
     window.CG.setPin(kind, v);
-    setVals(s=>({ ...s, [kind]:"" })); setSaved(kind); setTimeout(()=>setSaved(""), 2000);
+    setVals(s=>({ ...s, [kind]:"" })); setSaved(kind); setTimeout(()=>setSaved(""), 2600);
   };
   return (
     <div>
@@ -165,6 +165,15 @@ function SeguridadScreen({ ai }) {
           </Card>
         ))}
       </div>
+      {/* Confirmación visible: antes solo cambiaba el botón a "Guardado" (muy sutil). */}
+      {saved && (
+        <div className="cg-modal-in" style={{ position:"fixed", left:"50%", bottom:28, transform:"translateX(-50%)",
+          zIndex:500, display:"flex", alignItems:"center", gap:10, background:Cp.ink, color:Cp.cream||"#F1E7D6",
+          padding:"13px 19px", borderRadius:12, boxShadow:"0 18px 44px -16px rgba(0,0,0,0.55)", font:`700 13.5px/1 ${Fp.ui}` }}>
+          <Icon name="check-circle" size={18} color={Cp.green} />
+          PIN actualizado correctamente
+        </div>
+      )}
     </div>
   );
 }

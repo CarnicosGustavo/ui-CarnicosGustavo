@@ -113,7 +113,16 @@ function CompraScreen({ ai }) {
   const [provs, setProvs] = useState(c.proveedores);
   const sum = (k)=> provs.reduce((s,p)=>s+(Number(p[k])||0),0);
   const hoy = ()=> setFecha(new Date().toLocaleDateString("es-MX",{ day:"2-digit", month:"2-digit", year:"numeric" }));
-  const addProv = ()=> setProvs(a=>[...a, { nombre:"Nuevo proveedor", americanos:0, nacionales:0, canales:0, kgPie:0, precioKg:0, kgCanal:0 }]);
+  const addProv = ()=> setProvs(a=>[...a, { nombre:"", americanos:0, nacionales:0, canales:0, kgPie:0, precioKg:0, kgCanal:0 }]);
+  // Edición inline: al cambiar un campo recalculo Canales (= americanos+nacionales) y Kg/canal.
+  const updateProv = (i, patch)=> setProvs(arr=>arr.map((p,idx)=>{
+    if (idx!==i) return p;
+    const np = { ...p, ...patch };
+    np.canales = (Number(np.americanos)||0) + (Number(np.nacionales)||0);
+    np.kgCanal = np.canales>0 ? (Number(np.kgPie)||0)/np.canales : 0;
+    return np;
+  }));
+  const removeProv = (i)=> setProvs(arr=>arr.filter((_,idx)=>idx!==i));
   const chips = [
     ["Americanos", sum("americanos"), Cs.red, Cs.redWash],
     ["Nacionales", sum("nacionales"), Cs.green, Cs.greenWash],
@@ -163,24 +172,34 @@ function CompraScreen({ ai }) {
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:640 }}>
             <thead>
-              <tr>{["Proveedor","Americanos","Nacionales","Canales","Kg en pie","$ / kg","Kg/canal"].map((h,i)=>(
+              <tr>{["Proveedor","Americanos","Nacionales","Canales","Kg en pie","$ / kg","Kg/canal",""].map((h,i)=>(
                 <th key={i} style={{ textAlign:i===0?"left":"right", font:`600 11px/1 ${Fs.ui}`, letterSpacing:"0.06em",
                   textTransform:"uppercase", color:Cs.inkFaint, padding:"0 12px 12px" }}>{h}</th>))}</tr>
             </thead>
             <tbody>
               {provs.length===0 && (
-                <tr><td colSpan={7} style={{ padding:"22px 12px", textAlign:"center", font:`500 13px/1 ${Fs.ui}`, color:Cs.inkFaint }}>
+                <tr><td colSpan={8} style={{ padding:"22px 12px", textAlign:"center", font:`500 13px/1 ${Fs.ui}`, color:Cs.inkFaint }}>
                   Sin proveedores. Usa "Agregar proveedor" para empezar.</td></tr>
               )}
               {provs.map((p,i)=>(
                 <tr key={i} style={{ borderTop:`1px solid ${Cs.lineSoft}` }}>
-                  <td style={{ padding:"14px 12px", font:`700 14px/1 ${Fs.ui}`, color:Cs.ink }}>{p.nombre}</td>
-                  <Cell v={p.americanos} accent={p.americanos>0?Cs.red:null} />
-                  <Cell v={p.nacionales} accent={p.nacionales>0?Cs.green:null} />
-                  <Cell v={p.canales} bold />
-                  <Cell v={p.kgPie.toLocaleString("es-MX")} />
-                  <Cell v={p.precioKg.toFixed(1)} />
-                  <td style={{ textAlign:"right", padding:"14px 12px", font:`500 14px/1 ${Fs.mono}`, color:Cs.inkSoft }}>{p.kgCanal.toFixed(1)}</td>
+                  <td style={{ padding:"8px 12px 8px 8px" }}>
+                    <input value={p.nombre} onChange={e=>updateProv(i,{ nombre:e.target.value })} placeholder="Nombre del proveedor"
+                      style={{ width:"100%", minWidth:150, font:`700 14px/1 ${Fs.ui}`, color:Cs.ink, background:Cs.paper2,
+                        border:`1px solid ${Cs.line}`, borderRadius:8, padding:"9px 11px", outline:"none" }} />
+                  </td>
+                  <EditCell value={p.americanos} onChange={v=>updateProv(i,{ americanos:v })} accent={Number(p.americanos)>0?Cs.red:null} />
+                  <EditCell value={p.nacionales} onChange={v=>updateProv(i,{ nacionales:v })} accent={Number(p.nacionales)>0?Cs.green:null} />
+                  <td style={{ textAlign:"right", padding:"14px 12px", font:`700 14px/1 ${Fs.mono}`, color:Cs.ink }}>{Number(p.canales)||0}</td>
+                  <EditCell value={p.kgPie} onChange={v=>updateProv(i,{ kgPie:v })} />
+                  <EditCell value={p.precioKg} onChange={v=>updateProv(i,{ precioKg:v })} step="0.1" />
+                  <td style={{ textAlign:"right", padding:"14px 12px", font:`500 14px/1 ${Fs.mono}`, color:Cs.inkSoft }}>{(Number(p.kgCanal)||0).toFixed(1)}</td>
+                  <td style={{ textAlign:"center", padding:"8px 6px" }}>
+                    <button onClick={()=>removeProv(i)} title="Quitar proveedor" className="cg-btn" style={{ width:30, height:30,
+                      borderRadius:8, border:`1px solid ${Cs.line}`, background:Cs.paper2, cursor:"pointer", display:"grid", placeItems:"center" }}>
+                      <Icon name="trash-2" size={15} color={Cs.inkSoft} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -196,6 +215,18 @@ function CompraScreen({ ai }) {
 function Cell({ v, accent, bold }) {
   return <td style={{ textAlign:"right", padding:"14px 12px",
     font:`${bold?700:500} 14px/1 ${Fs.mono}`, color: accent || (bold?Cs.ink:Cs.ink80) }}>{v}</td>;
+}
+/* Celda editable (input numérico) para capturar la compra en pie por proveedor. */
+function EditCell({ value, onChange, accent, step }) {
+  return (
+    <td style={{ padding:"8px" }}>
+      <input value={value} onChange={e=>onChange(e.target.value)} type="number" step={step} inputMode="decimal"
+        onFocus={e=>{ try{ e.target.select(); }catch(_){} }}
+        style={{ width:"100%", maxWidth:108, textAlign:"right", font:`600 14px/1 ${Fs.mono}`,
+          color: accent||Cs.ink, background:Cs.paper2, border:`1px solid ${Cs.line}`, borderRadius:8,
+          padding:"9px 10px", outline:"none", minWidth:0, marginLeft:"auto", display:"block" }} />
+    </td>
+  );
 }
 
 window.money = money;

@@ -141,6 +141,7 @@ window.CG.ramonPedido = () => Ramon.ping();   // pulso verde al entrar un pedido
 function RamonMark() {
   const [alert, setAlert] = useState(Ramon.alert);
   const [order, setOrder] = useState(false);
+  const [blink, setBlink] = useState(false); // pulso rojo momentáneo (negro→rojo→negro)
   const tRef = useRef();
   useEffect(() => Ramon.sub(kind => {
     if (kind === "order") {
@@ -148,7 +149,19 @@ function RamonMark() {
       tRef.current = setTimeout(() => setOrder(false), 2600);
     } else setAlert(Ramon.alert);
   }), []);
-  const color = order ? Ca.green : (alert ? Ca.red : Ca.ink);
+  // Latido: un parpadeo rojo breve cada ~20s aunque no haya alerta (presencia viva).
+  useEffect(() => {
+    const iv = setInterval(() => { setBlink(true); setTimeout(() => setBlink(false), 650); }, 20000);
+    return () => clearInterval(iv);
+  }, []);
+  // Con alerta: parpadeo rojo continuo (negro ↔ rojo) hasta que se atienda.
+  useEffect(() => {
+    if (!alert) { setBlink(false); return; }
+    const iv = setInterval(() => setBlink(b => !b), 750);
+    return () => clearInterval(iv);
+  }, [alert]);
+  // Reposo = negro · pedido nuevo = verde · parpadeo/alerta = rojo (la transición CSS lo suaviza).
+  const color = order ? Ca.green : (blink ? Ca.red : Ca.ink);
   const label = order ? "Pedido nuevo" : (alert ? "Avisos pendientes" : "Cárnicos Gustavo");
   return (
     <button onClick={() => window.__cgGo && window.__cgGo("panel")} title={"Ramón · " + label}
@@ -181,10 +194,10 @@ function TopBar({ current, theme }) {
           display:"grid", placeItems:"center", cursor:"pointer" }}>
           <Icon name="lock" size={18} color={Ca.inkSoft} />
         </button>
-        <button title="Mi perfil" onClick={()=>window.__cgGo&&window.__cgGo("perfil")}
-          style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.line}`, background:Ca.paper2,
+        <button title="Mi perfil" className="cg-btn" onClick={()=>window.__cgGo&&window.__cgGo("perfil")}
+          style={{ width:38, height:38, borderRadius:"50%", border:`1px solid ${Ca.ink}`, background:Ca.ink,
           display:"grid", placeItems:"center", cursor:"pointer" }}>
-          <Icon name="user" size={19} color={Ca.inkSoft} />
+          <Icon name="user" size={19} color={Ca.cream} />
         </button>
       </div>
     </header>
