@@ -38,6 +38,8 @@ window.CG.logAuth = function (action) {
 // Uso: CG.requireAuth(() => { ...acción... }, "¿Eliminar el pedido #123?")
 window.CG.requireAuth = function (onOk, msg) {
   var wrapped = function () { window.CG.logAuth(msg); if (onOk) onOk(); };
+  var off = false; try { off = localStorage.getItem("cg_auth_required") === "0"; } catch (e) {}
+  if (off) { wrapped(); return; } // tweak: exigir PIN desactivado en Configuración
   if (window.CG.requirePin) window.CG.requirePin("privacy", wrapped, { msg: msg || "Confirma con tu PIN para autorizar esta acción", auth: true });
   else wrapped();
 };

@@ -18,7 +18,7 @@ function Slot({ id, ai }) {
 /* ---------------- PANEL ---------------- */
 function PanelScreen({ ai }) {
   const p = D.panel;
-  const [hide, setHide] = useState(true); // montos ocultos por defecto; se revelan con el PIN de privacidad
+  const [hide, setHide] = useState(()=> { try { return localStorage.getItem("cg_hide_default")!=="0"; } catch(e){ return true; } }); // preferencia en Configuración
   const m = (v)=> hide ? "•  •  •" : moneyk(v);
   const totalCat = p.ingresosCat.reduce((s,x)=>s+x.v,0);
   // donut conic

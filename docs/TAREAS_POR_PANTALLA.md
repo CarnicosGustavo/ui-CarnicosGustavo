@@ -25,7 +25,12 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
   pantalla, panel con lista y **Exportar informe** (.md + portapapeles). localStorage.
 - ✅ Campana del header consume avisos **reales** (`/api/notifications`) con fallback a
   derivados de `CG.ops`; `NotificationCenter` (config-antonella) también cableado al real.
-- ⏳ **Dashboard de Configuración** ("tipo tweaks") — plan en `docs/PLAN_CONFIG_DASHBOARD.md`
+- ✅ **Dashboard de Configuración F1** ("tipo tweaks", `ConfigDashboard` en `cg-config.jsx`):
+  semáforos (datos reales vs mock vía `CG.meta.source`; PINs en 0000), contadores
+  (productos/clientes/pedidos/avisos/autorizaciones/PINs) y **ajustes rápidos** con efecto
+  real: modo oscuro, ocultar montos por defecto (`cg_hide_default`), exigir PIN en acciones
+  sensibles (`cg_auth_required`). Plan/fases en `docs/PLAN_CONFIG_DASHBOARD.md`.
+- ⏳ Dashboard F2 (`/api/config-status`: precios en $0, clientes sin lista, recetas sin calibrar)
 - ✅ **Centro "Pendientes y Autorizaciones"** (`cg-agente.jsx`, ruta `pendientes`): tareas
   pendientes (avisos reales + fallback) + **bitácora de autorizaciones** (`CG.authLog`,
   cada acción aprobada con PIN queda registrada) + resumen de iAntonella. Acceso desde la

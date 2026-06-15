@@ -6,11 +6,57 @@ const Fc = window.CG.font;
 const CFG = window.CG.config;
 const m$ = (n)=> "$"+Number(n).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2});
 
+/* ---------- Dashboard de estado ("tipo tweaks") ---------- */
+function ConfigDashboard() {
+  const [, setTick] = useState(0);
+  useEffect(()=>{ const h=()=>setTick(x=>x+1); window.addEventListener("cg:data",h); window.addEventListener("cg:authlog",h);
+    return ()=>{ window.removeEventListener("cg:data",h); window.removeEventListener("cg:authlog",h); }; },[]);
+  const ls = (k,d)=>{ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } };
+  const setLs = (k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} setTick(x=>x+1); };
+  const src = (window.CG.meta && window.CG.meta.source) || "mock";
+  const pins = ["privacy","cedis","frio"].map(k=> (window.CG.getPin?window.CG.getPin(k):"0000"));
+  const pinsDefault = pins.filter(p=>p==="0000").length;
+  const O = window.CG.ops||{};
+  const counts = [
+    ["Productos", (CFG.productos||[]).length],
+    ["Clientes", (O.clientes||[]).length],
+    ["Pedidos", (O.pedidos||[]).length],
+    ["Avisos abiertos", (window.CG.buildNotifs?window.CG.buildNotifs().length:0)],
+    ["Autorizaciones", (window.CG.authLog?window.CG.authLog().length:0)],
+    ["PINs propios", 3-pinsDefault],
+  ];
+  const mode = ls("cg_mode","light");
+  const hideDef = ls("cg_hide_default","1")!=="0";
+  const authReq = ls("cg_auth_required","1")!=="0";
+  const Sem = (p)=> (<span style={{ display:"inline-flex", alignItems:"center", gap:6, font:`700 11.5px/1 ${Fc.ui}`, color:Cc.ink, background:Cc.paper2, border:`1px solid ${Cc.line}`, borderRadius:999, padding:"6px 11px" }}><span style={{ width:8,height:8,borderRadius:"50%", background: p.ok?Cc.green:(p.warn?Cc.amber:Cc.red) }} />{p.label}</span>);
+  const Tog = (p)=> (<button onClick={p.onClick} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, width:"100%", padding:"11px 13px", borderRadius:11, border:`1px solid ${Cc.line}`, background:Cc.paper, cursor:"pointer", font:`600 13px/1.2 ${Fc.ui}`, color:Cc.ink }}><span style={{ textAlign:"left" }}>{p.label}</span><span style={{ width:38, height:22, borderRadius:999, background:p.on?Cc.green:Cc.line, position:"relative", flexShrink:0, transition:"background .15s" }}><span style={{ position:"absolute", top:2, left:p.on?18:2, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left .15s" }} /></span></button>);
+  return (
+    <div style={{ marginBottom:18 }}>
+      <div style={{ display:"flex", gap:9, flexWrap:"wrap", marginBottom:13 }}>
+        <Sem ok={src==="supabase"} warn={src!=="supabase"} label={src==="supabase"?"Datos reales (Supabase)":"Datos de ejemplo (mock)"} />
+        <Sem ok={pinsDefault===0} warn={pinsDefault>0} label={pinsDefault===0?"PINs configurados":`${pinsDefault} PIN(s) en 0000`} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:11, marginBottom:13 }}>
+        {counts.map((c,i)=>(<Card key={i} pad={14}><div style={{ font:`700 10.5px/1 ${Fc.ui}`, letterSpacing:"0.05em", textTransform:"uppercase", color:Cc.inkFaint, marginBottom:6 }}>{c[0]}</div><Stat value={String(c[1])} color={Cc.ink} size={24} /></Card>))}
+      </div>
+      <Card pad={14}>
+        <div style={{ font:`700 13px/1 ${Fc.ui}`, color:Cc.ink, marginBottom:11 }}>Ajustes rápidos</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
+          <Tog on={mode==="dark"} label="Modo oscuro" onClick={()=>{ const nm=mode==="dark"?"light":"dark"; const pal=ls("cg_palette","warm"); if(window.__cgSetTheme) window.__cgSetTheme(pal,nm); setTick(x=>x+1); }} />
+          <Tog on={hideDef} label="Ocultar montos por defecto" onClick={()=>setLs("cg_hide_default", hideDef?"0":"1")} />
+          <Tog on={authReq} label="Pedir PIN en acciones sensibles" onClick={()=>setLs("cg_auth_required", authReq?"0":"1")} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /* ---------- HUB de Configuración ---------- */
 function ConfigScreen({ ai, go }) {
   return (
     <div>
-      <ScreenHead title="Configuración" desc="Catálogo, recetas, precios y parámetros del sistema. Cada acceso abre su módulo." />
+      <ScreenHead title="Configuración" desc="Estado del sistema, ajustes rápidos y accesos a cada módulo." />
+      <ConfigDashboard />
       <Slot id="caja" ai={ai} />
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:13, marginBottom:18 }}>
         {window.CG.configItems.filter(i=>i.id!=="settings").map(it=>(

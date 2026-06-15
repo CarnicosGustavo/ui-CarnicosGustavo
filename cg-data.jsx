@@ -532,11 +532,13 @@ function cgDeepMerge(target, src) {
   }
   return target;
 }
+CG.meta = { source: "mock", at: null };
 CG.refresh = function () {
   return fetch("/api/cg-data", { headers: { accept: "application/json" } })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (payload) {
-      if (!payload || payload._source === "mock") return;
+      CG.meta = { source: (payload && payload._source) || "mock", at: Date.now() };
+      if (!payload || payload._source === "mock") { window.dispatchEvent(new Event("cg:data")); return; }
       if (payload.data) cgDeepMerge(CG.data, payload.data);
       if (payload.config) cgDeepMerge(CG.config, payload.config);
       if (payload.ops) cgDeepMerge(CG.ops, payload.ops);
