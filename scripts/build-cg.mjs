@@ -12,6 +12,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // Orden de carga (idéntico al index.html original del prototipo).
 const FILES = [
 	"cg-data",
+	"cg-notif",
 	"cg-ui",
 	"cg-antonella",
 	"cg-ai-kit",
