@@ -47,5 +47,14 @@ export default async function handler(req, res) {
 		if (pzs > 0) items.push({ id: "despiece", tipo: "info", titulo: "Despiece sugerido", desc: `${pzs} pieza(s) pedidas por producir. iAntonella puede calcular el despiece.`, href: "despiece", time: "hoy" });
 	} catch (e) { console.error("notif.despiece", e?.message); }
 
+	// 4) Despiece realizado recientemente (últimas 6 h) → confirma la acción
+	try {
+		const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
+		const { data: dz } = await db.from("inventory_transactions")
+			.select("quantity_change_pieces, created_at").eq("transaction_type", "DESPIECE").gte("created_at", since);
+		const prod = (dz || []).filter((t) => Number(t.quantity_change_pieces) > 0).reduce((s, t) => s + Number(t.quantity_change_pieces), 0);
+		if (prod > 0) items.push({ id: "despiece-ok", tipo: "info", titulo: "Despiece realizado", desc: `Se produjeron ${prod} pieza(s) por despiece recientemente.`, href: "despiece", time: "hoy" });
+	} catch (e) { console.error("notif.despiece-ok", e?.message); }
+
 	return res.status(200).json({ _source: "supabase", count: items.length, items });
 }

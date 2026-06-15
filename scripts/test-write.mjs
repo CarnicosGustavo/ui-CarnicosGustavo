@@ -1,5 +1,5 @@
 // Pruebas de la lógica de api/write.js con un mock en memoria de supabase-js.
-import { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields } from "../api/write.js";
+import { deductInventoryForOrder, syncCanalStock, disassemble, toVariant, calibrateYields, autoDisassemble } from "../api/write.js";
 
 function makeDb(store, log){
   function matches(row, filters){
@@ -103,6 +103,19 @@ const A=(c,m)=>{ if(!c){ console.error("✗ "+m); fails++; } else console.log("�
     A(T(3).yield_weight_ratio===0.1,"calibrate: pieza sin pesar NO cambia");
     A(r.updated===2 && r.piezasPesadas===2 && r.totalCanalKg===200,"calibrate: updated=2, pesadas=2, canalKg=200");
   }
+  // ---- autoDisassemble: cubre el faltante (demanda 10, stock 2) ----
+  {
+    const store={ order_items:[{id:1,order_id:9,product_id:200,quantity_pieces:10,status:"PENDIENTE_PESAJE"}],
+      products:[{id:100,name:"CANAL AMERICANO",is_parent_product:true,stock_pieces:5,weighed_pieces:0,stock_kg:525},{id:200,is_parent_product:false,stock_pieces:2,stock_kg:0}],
+      product_transformations:[{id:1,parent_product_id:100,child_product_id:200,yield_quantity_pieces:2,yield_weight_ratio:0.3,transformation_type:"BASE",is_active:true}],
+      inventory_transactions:[] };
+    const r=await autoDisassemble(makeDb(store,[]));
+    const P=(id)=>store.products.find(x=>x.id===id);
+    A(r.canalsProcessed===1 && r.executed[0].qty===4, `auto: despiece qty=4 (faltante 8 / 2pz = 4 canales) (got ${r.executed[0]?.qty})`);
+    A(P(100).stock_pieces===1, `auto: canal 5-4=1 (got ${P(100).stock_pieces})`);
+    A(P(200).stock_pieces===10, `auto: hijo 2 + 8 = 10 cubre demanda (got ${P(200).stock_pieces})`);
+  }
+
   console.log(fails?`\n❌ ${fails} FALLO(S)`:"\n✅ TODOS LOS TESTS PASARON");
   process.exitCode = fails?1:0;
 })();
