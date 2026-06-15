@@ -143,27 +143,64 @@ function IconBtn({ icon, color, onClick }) {
 
 /* ---------- PRECIOS ---------- */
 function PreciosScreen({ ai }) {
-  const p = CFG.precios;
-  const clientes = (window.CG.ops.clientes||[]).map(c=>c.nombre);
-  const [cli, setCli] = useState(p.cliente);
+  const clientes = window.CG.ops.clientes || [];
+  const [cli, setCli] = useState(clientes[0] || null);
+  const [openCli, setOpenCli] = useState(false);
   const [q, setQ] = useState("");
-  const [precios, setPrecios] = useState(()=> p.lista.map(r=>r.kg));
+  const [lista, setLista] = useState(()=> ((CFG.precios && CFG.precios.lista) || []).map(r=>({ productId:null, n:r.n, cat:r.cat, kg:r.kg, pz:r.pz, hasCustom:false })));
+  const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const cycleCli = ()=>{ if(!clientes.length) return; const i=clientes.indexOf(cli); setCli(clientes[(i+1)%clientes.length]); };
-  const view = p.lista.map((r,idx)=>({ r, idx })).filter(o=> !q || o.r.n.toLowerCase().includes(q.toLowerCase()));
+
+  const cargar = (c)=>{
+    if (!c || !c.id || typeof window.fetch !== "function") return;
+    setLoading(true);
+    window.fetch("/api/customer-prices?customerId=" + c.id)
+      .then(r=> r.ok ? r.json() : null)
+      .then(d=>{ if (d && Array.isArray(d.items)) setLista(d.items); })
+      .catch(()=>{})
+      .then(()=> setLoading(false));
+  };
+  useEffect(()=>{ if (cli && cli.id) cargar(cli); /* carga inicial */ }, []); // eslint-disable-line
+  const selectCli = (c)=>{ setCli(c); setOpenCli(false); cargar(c); };
+  const setKg = (idx, v)=> setLista(a=>a.map((x,j)=> j===idx ? { ...x, kg:v } : x));
+  const view = lista.map((r,idx)=>({ r, idx })).filter(o=> !q || o.r.n.toLowerCase().includes(q.toLowerCase()));
+  const guardar = ()=>{
+    if (cli && cli.id && window.CG.write) {
+      const items = lista.filter(r=>r.productId).map(r=>({
+        productId:r.productId,
+        pricePerKg: parseFloat(r.kg) > 0 ? parseFloat(r.kg) : null,
+        pricePerPiece: r.pz != null ? Number(r.pz) : null,
+      }));
+      window.CG.write("prices.bulkUpsert", { customerId:cli.id, items })
+        .then(function(rr){ if (rr && rr.ok) { setDone(true); setTimeout(()=>setDone(false),2000); if(window.CG.refresh) window.CG.refresh(); } });
+    } else { setDone(true); setTimeout(()=>setDone(false),2000); }
+  };
   return (
     <div>
       <ScreenHead title="Precios por Cliente" desc="Cada cliente guarda su propia lista de precios. Se usa al generar su pedido y ticket."
-        right={<Btn kind="dark" icon="save" onClick={()=>{ setDone(true); setTimeout(()=>setDone(false),2000); }}>{done?"✓ Guardado":"Guardar precios"}</Btn>} />
+        right={<Btn kind="dark" icon="save" onClick={guardar}>{done?"✓ Guardado":"Guardar precios"}</Btn>} />
       <Slot id="precios" ai={ai} />
       <Card style={{ marginBottom:14 }}>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }} className="cg-two-col">
           <div>
             <Overline style={{ marginBottom:8 }}>Cliente</Overline>
-            <div onClick={cycleCli} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${Cc.line}`, borderRadius:11, padding:"13px 14px", background:Cc.paper2, cursor:"pointer" }}>
-              <Icon name="user" size={16} color={Cc.inkSoft} />
-              <span style={{ flex:1, font:`700 14px/1 ${Fc.ui}`, color:Cc.ink }}>{cli}</span>
-              <Icon name="chevron-down" size={16} color={Cc.inkFaint} />
+            <div style={{ position:"relative" }}>
+              <div onClick={()=>setOpenCli(o=>!o)} style={{ display:"flex", alignItems:"center", gap:9, border:`1px solid ${openCli?Cc.red:Cc.line}`, borderRadius:11, padding:"13px 14px", background:Cc.paper2, cursor:"pointer" }}>
+                <Icon name="user" size={16} color={Cc.inkSoft} />
+                <span style={{ flex:1, font:`700 14px/1 ${Fc.ui}`, color:Cc.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{cli ? cli.nombre : "Selecciona cliente"}</span>
+                <Icon name="chevron-down" size={16} color={Cc.inkFaint} />
+              </div>
+              {openCli && (
+                <>
+                  <div onClick={()=>setOpenCli(false)} style={{ position:"fixed", inset:0, zIndex:40 }} />
+                  <div style={{ position:"absolute", top:"calc(100% + 6px)", left:0, right:0, zIndex:50, background:Cc.paper, border:`1px solid ${Cc.line}`, borderRadius:11, boxShadow:Cc.shadow, maxHeight:260, overflowY:"auto", padding:5 }}>
+                    {clientes.map(c=>(
+                      <button key={c.id} onClick={()=>selectCli(c)} className="cg-menu-item" style={{ display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent", cursor:"pointer", font:`600 13.5px/1 ${Fc.ui}`, color:Cc.ink, padding:"10px 11px", borderRadius:8 }}>{c.nombre}</button>
+                    ))}
+                    {!clientes.length && <div style={{ padding:"10px 11px", font:`500 13px/1 ${Fc.ui}`, color:Cc.inkFaint }}>Sin clientes</div>}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div>
@@ -176,8 +213,9 @@ function PreciosScreen({ ai }) {
         </div>
       </Card>
       <Card pad={0} style={{ overflow:"hidden" }}>
-        <div style={{ padding:"14px 16px", borderBottom:`1px solid ${Cc.line}` }}>
+        <div style={{ padding:"14px 16px", borderBottom:`1px solid ${Cc.line}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <h3 style={{ margin:0, font:`700 15px/1 ${Fc.ui}`, color:Cc.ink }}>Lista de precios</h3>
+          {loading && <span style={{ font:`600 12px/1 ${Fc.ui}`, color:Cc.inkSoft }}>Cargando…</span>}
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:520 }}>
@@ -187,19 +225,21 @@ function PreciosScreen({ ai }) {
                   textTransform:"uppercase", color:Cc.inkFaint, padding:"12px 16px" }}>{h}</th>))}</tr></thead>
             <tbody>
               {view.map(({ r, idx })=>(
-                <tr key={idx} style={{ borderTop:`1px solid ${Cc.lineSoft}` }}>
+                <tr key={idx} style={{ borderTop:`1px solid ${Cc.lineSoft}`, background: r.hasCustom ? Cc.greenWash+"55" : "transparent" }}>
                   <td style={{ padding:"12px 16px" }}>
                     <span style={{ font:`700 13.5px/1 ${Fc.ui}`, color:Cc.ink }}>{r.n}</span>
                     <span style={{ font:`500 11px/1 ${Fc.ui}`, color:Cc.inkFaint, marginLeft:8 }}>{r.cat}</span></td>
                   <td style={{ padding:"12px 16px", textAlign:"right" }}>
-                    <input value={precios[idx]} inputMode="decimal"
-                      onChange={e=>{ const v=e.target.value; setPrecios(a=>a.map((x,j)=>j===idx?v:x)); }}
-                      style={priceInput(Number(precios[idx])>0)} /></td>
+                    <input value={r.kg} inputMode="decimal"
+                      onChange={e=>setKg(idx, e.target.value)}
+                      style={priceInput(Number(r.kg)>0)} /></td>
                   <td style={{ padding:"12px 16px", textAlign:"right" }}>
-                    <div style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:96, height:38,
-                      borderRadius:9, border:`1px dashed ${Cc.line}`, color:Cc.inkFaint, font:`500 14px/1 ${Fc.mono}` }}>—</div></td>
+                    {r.pz != null
+                      ? <span style={{ font:`600 14px/1 ${Fc.mono}`, color:Cc.ink }}>{m$(r.pz)}</span>
+                      : <div style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:96, height:38, borderRadius:9, border:`1px dashed ${Cc.line}`, color:Cc.inkFaint, font:`500 14px/1 ${Fc.mono}` }}>—</div>}</td>
                 </tr>
               ))}
+              {view.length===0 && <tr><td colSpan={3} style={{ padding:"22px 16px", textAlign:"center", font:`500 13px/1 ${Fc.ui}`, color:Cc.inkFaint }}>Sin productos.</td></tr>}
             </tbody>
           </table>
         </div>
