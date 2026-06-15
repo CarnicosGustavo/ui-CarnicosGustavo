@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 	const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 	try {
 		const { data: order } = await db.from("orders")
-			.select("id, total_amount, status, created_at, customer_id, customers(name, phone, whatsapp_phone)")
+			.select("id, total_amount, status, created_at, notes, delivery_address, customer_id, customers(name, phone, whatsapp_phone)")
 			.eq("id", orderId).single();
 		if (!order) return res.status(404).json({ error: "pedido no encontrado" });
 		const { data: its } = await db.from("order_items")
@@ -41,12 +41,17 @@ export default async function handler(req, res) {
 			db.from("credit_charges").select("id").eq("order_id", orderId).limit(1),
 		]);
 		const paymentStatus = (tx && tx[0]) ? "PAGADO" : (ch && ch[0]) ? "CREDITO" : "PENDIENTE";
+		// Pagado / por cobrar (paridad con el ticket de M1)
+		const amountPaid = paymentStatus === "PAGADO" ? totalAmount : 0;
+		const amountDue = paymentStatus === "PAGADO" ? 0 : totalAmount;
 		return res.status(200).json({
 			ticketNumber: pad6(order.id), orderNumber: order.id,
 			customerName: order.customers?.name || null,
+			customerCode: order.customer_id ? "C" + pad6(order.customer_id) : null,
 			customerPhone: order.customers?.whatsapp_phone || order.customers?.phone || null,
-			date: order.created_at, status: order.status,
-			items, totalKg: +totalKg.toFixed(3), totalAmount, paymentStatus,
+			deliveryAddress: order.delivery_address || null,
+			date: order.created_at, status: order.status, notes: order.notes || null,
+			items, totalKg: +totalKg.toFixed(3), totalAmount, amountPaid, amountDue, paymentStatus,
 		});
 	} catch (e) {
 		console.error("ticket", e?.message);
