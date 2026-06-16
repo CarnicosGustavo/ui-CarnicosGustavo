@@ -11,10 +11,13 @@ const mnyVk = window.moneyk;      // "$1.5k"
 /* ---- Datos legacy: capa async window.CG.validacion (cg-validacion-data.jsx → /api/validacion).
    list() lee public.v_validacion_saldos / v_validacion_docs (exponen staging.legacy_credit_*);
    validate() llama al RPC validar_saldo_legacy. Sin backend, list() resuelve []. ---- */
-function loadLegacy(setRows) {
+function loadLegacy(setRows, setLoading) {
   if (window.CG && window.CG.validacion && typeof window.CG.validacion.list === "function") {
-    window.CG.validacion.list().then(function (list) { setRows(Array.isArray(list) ? list : []); });
-  }
+    window.CG.validacion.list().then(function (list) {
+      setRows(Array.isArray(list) ? list : []);
+      if (setLoading) setLoading(false);
+    });
+  } else if (setLoading) { setLoading(false); }
 }
 
 /* badge por estado de cliente */
@@ -31,6 +34,7 @@ const DOC_TONE = { "Vencido":"red", "Parcial":"amber", "Aplicado":"blue", "Pagad
    ============================================================ */
 function ValidacionSaldosScreen({ ai }) {
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);   // primera carga async
   const [view, setView] = useState("list");      // "list" | "detail"
   const [selId, setSelId] = useState(null);
   const [confirm, setConfirm] = useState(null);   // cliente a confirmar
@@ -38,7 +42,7 @@ function ValidacionSaldosScreen({ ai }) {
   const sel = rows.find(r=>r.id===selId);
 
   // Cargar de Supabase al montar (capa async de cg-validacion-data.jsx → /api/validacion).
-  useEffect(()=>{ loadLegacy(setRows); }, []);
+  useEffect(()=>{ loadLegacy(setRows, setLoading); }, []);
 
   const validar = (c) => {
     const hoy = new Date().toISOString().slice(0,10);
@@ -62,7 +66,7 @@ function ValidacionSaldosScreen({ ai }) {
   return (
     <div>
       {view==="list"
-        ? <BandejaValidacion rows={rows} onOpen={goDetail} onValidar={(c)=>setConfirm(c)} ai={ai} />
+        ? <BandejaValidacion rows={rows} loading={loading} onOpen={goDetail} onValidar={(c)=>setConfirm(c)} ai={ai} />
         : <DetalleCliente cliente={sel} onBack={()=>setView("list")} onValidar={(c)=>setConfirm(c)} />}
 
       {/* Modal de confirmación */}
@@ -106,7 +110,7 @@ function ValidacionSaldosScreen({ ai }) {
 /* ============================================================
    Vista A — Bandeja (lista densa)
    ============================================================ */
-function BandejaValidacion({ rows, onOpen, onValidar, ai }) {
+function BandejaValidacion({ rows, loading, onOpen, onValidar, ai }) {
   const [filtro, setFiltro] = useState("Todos");
   const [q, setQ] = useState("");
 
@@ -174,11 +178,18 @@ function BandejaValidacion({ rows, onOpen, onValidar, ai }) {
 
       {/* Tabla / vacío */}
       {visible.length===0 ? (
-        <Card pad={48} style={{ textAlign:"center" }}>
-          <Icon name="party-popper" size={40} color={Cv.green} />
-          <div style={{ font:`400 19px/1.3 ${Fv.display}`, color:Cv.ink, marginTop:14 }}>No quedan saldos pendientes por validar</div>
-          <div style={{ font:`500 13px/1.4 ${Fv.ui}`, color:Cv.inkFaint, marginTop:8 }}>Todos los clientes de esta vista están al día.</div>
-        </Card>
+        loading ? (
+          <Card pad={48} style={{ textAlign:"center" }}>
+            <Icon name="loader-circle" size={34} color={Cv.inkFaint} />
+            <div style={{ font:`500 14px/1.4 ${Fv.ui}`, color:Cv.inkSoft, marginTop:12 }}>Cargando saldos del sistema anterior…</div>
+          </Card>
+        ) : (
+          <Card pad={48} style={{ textAlign:"center" }}>
+            <Icon name="party-popper" size={40} color={Cv.green} />
+            <div style={{ font:`400 19px/1.3 ${Fv.display}`, color:Cv.ink, marginTop:14 }}>No quedan saldos pendientes por validar</div>
+            <div style={{ font:`500 13px/1.4 ${Fv.ui}`, color:Cv.inkFaint, marginTop:8 }}>Todos los clientes de esta vista están al día.</div>
+          </Card>
+        )
       ) : (
         <Card pad={0} style={{ overflow:"hidden" }}>
           <div style={{ overflowX:"auto" }}>
