@@ -76,3 +76,6 @@ if (len < 200) {
 	process.exit(2);
 }
 console.log("\n✅ La app monta y renderiza contenido sin errores.");
+// Salida explícita: algunos componentes dejan timers vivos (setInterval de
+// notificaciones/Ramón) que mantendrían el proceso abierto en CI.
+process.exit(0);
