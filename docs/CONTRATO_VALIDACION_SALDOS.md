@@ -79,7 +79,20 @@ validar_saldo_legacy(p_customer_id integer, p_usuario text) returns ...
 Debe ser atómico: crear/actualizar la cuenta de crédito, sembrar el saldo inicial
 como cargo, y marcar el registro legacy como validado (con usuario y fecha).
 
+## ⚠️ public vs staging — el RPC tiene dos versiones
+El RPC existe en **dos esquemas** con la misma firma:
+- `staging.validar_saldo_legacy(int,text) → text` — la **lógica real**: crea/actualiza
+  `credit_accounts`, siembra el cargo `'Saldo inicial MBPOS 2022'` (idempotente) y marca validado.
+- `public.validar_saldo_legacy(int,text) → boolean` — **lo que llama la app** (PostgREST solo
+  expone `public`). **DELEGA** en la de staging (`perform staging.validar_saldo_legacy(...)`).
+
+> Histórico: hasta 2026-06-16 la versión `public` era un **stub** que solo marcaba
+> `validado=true` sin mover el saldo a cobranza. El fix (delegar a staging) está en
+> `sql/2026-06-16_validacion_saldos.sql` y aplicado en la BD.
+
 ## Estado de la verificación
 - ✅ Contrato JS (endpoint ↔ pantalla): auditado, los campos coinciden.
-- ⏳ Vistas/RPC en Supabase: **pendiente de verificar** (correr el SQL de arriba).
-  Si falta alguna, la pantalla muestra "Cargando…" → vacío.
+- ✅ Vistas/RPC en Supabase: **verificado** (2026-06-16). Existen `v_validacion_saldos`,
+  `v_validacion_docs` y `public.validar_saldo_legacy`; columnas compatibles; datos reales
+  158 clientes / 79 con saldo. `public` ya delega en `staging` (Validar mueve el saldo a crédito).
+- 📄 Migración reproducible: `sql/2026-06-16_validacion_saldos.sql`.
