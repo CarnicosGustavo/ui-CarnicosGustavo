@@ -116,7 +116,8 @@ Leyenda: ✅ hecho · 🔧 cableado flojo / a pulir · ⏳ pendiente (no persist
 
 ## Productos
 - ✅ buscar · ✅ **agregar/editar/borrar** persisten → `product.*` · importar (file picker)
-- 🔧 editar solo nombre (prompt); falta editar precio/stock/categoría
+- ✅ **alta/edición en modal** (nombre, categoría, **tipo Padre/Hijo**, precio/kg, stock) →
+  `product.create` / `product.update` (incluye `is_parent_product`); reemplaza los prompts encadenados
 
 ## Precios por cliente
 - ✅ **dropdown de cliente** + carga precios del cliente (`/api/customer-prices`)
