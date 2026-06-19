@@ -138,24 +138,32 @@ function ProductosScreen({ ai }) {
   const tipos = ["Todos","Canal de Cerdo","Pierna de Cerdo","Espilomo"];
   const view = prods.filter(p=> !q || p.n.toLowerCase().includes(q.toLowerCase()));
   const W = (op,params)=> window.CG.write && window.CG.write(op,params).then(function(r){ if(r&&r.ok&&window.CG.refresh) window.CG.refresh(); });
-  const addProd = ()=>{ const n=window.prompt("Nombre del producto nuevo"); if(!n||!n.trim()) return; setProds(a=>[{ n:n.trim(), tipo:"Hijo", rend:null, precio:0, stock:0 }, ...a]); W("product.create",{name:n.trim()}); };
-  const editProd = (p)=>{
-    const n = window.prompt("Nombre del producto", p.n); if (n===null) return;
-    const pr = window.prompt("Precio por kg ($)", String(p.precio ?? 0)); if (pr===null) return;
-    const st = window.prompt("Stock (piezas)", String(p.stock ?? 0)); if (st===null) return;
-    const cg = window.prompt("Categoría", p.cat || ""); if (cg===null) return;
-    const nn = n.trim() || p.n;
-    const npr = (!isNaN(parseFloat(pr)) && parseFloat(pr) >= 0) ? parseFloat(pr) : (p.precio ?? 0);
-    const nst = (!isNaN(parseInt(st, 10)) && parseInt(st, 10) >= 0) ? parseInt(st, 10) : (p.stock ?? 0);
-    const ncat = cg.trim() || null;
-    setProds(a=>a.map(x=>x===p?{ ...x, n:nn, precio:npr, stock:nst, cat:ncat }:x));
-    if (p.id) W("product.update", { id:p.id, name:nn, price_per_kg:npr, stock_pieces:nst, category:ncat });
+  // Alta/edición en un solo modal (draft=null → cerrado; draft.ref=null → alta).
+  const [draft, setDraft] = useState(null);
+  const openNew  = ()=> setDraft({ ref:null, n:"", cat:"", tipo:"Hijo", precio:0, stock:0 });
+  const openEdit = (p)=> setDraft({ ref:p, n:p.n||"", cat:p.cat||"", tipo:p.tipo||"Hijo", precio:p.precio??0, stock:p.stock??0 });
+  const setF = (k,v)=> setDraft(d=>({ ...d, [k]:v }));
+  const saveDraft = ()=>{
+    const d = draft; if (!d) return;
+    const nn = (d.n||"").trim(); if (!nn) return;
+    const npr = (!isNaN(parseFloat(d.precio)) && parseFloat(d.precio) >= 0) ? parseFloat(d.precio) : 0;
+    const nst = (!isNaN(parseInt(d.stock, 10)) && parseInt(d.stock, 10) >= 0) ? parseInt(d.stock, 10) : 0;
+    const ncat = (d.cat||"").trim() || null;
+    const esPadre = d.tipo === "Padre";
+    if (d.ref) {
+      setProds(a=>a.map(x=>x===d.ref ? { ...x, n:nn, cat:ncat, tipo:d.tipo, precio:npr, stock:nst } : x));
+      if (d.ref.id) W("product.update", { id:d.ref.id, name:nn, category:ncat, price_per_kg:npr, stock_pieces:nst, is_parent_product:esPadre });
+    } else {
+      setProds(a=>[{ n:nn, tipo:d.tipo, rend:null, precio:npr, stock:nst, cat:ncat }, ...a]);
+      W("product.create", { name:nn, category:ncat, price_per_kg:npr, stock_pieces:nst, is_parent_product:esPadre });
+    }
+    setDraft(null);
   };
   const delProd = (p)=>window.CG.requireAuth(()=>{ setProds(a=>a.filter(x=>x!==p)); if(p.id) W("product.delete",{id:p.id}); }, `¿Eliminar ${p.n}? Autoriza con tu PIN.`);
   return (
     <div>
       <ScreenHead title="Productos" desc="Catálogo completo: piezas padre (se despiezan) e hijas (se venden). El % de rendimiento viene de las recetas."
-        right={<><Btn kind="dark" icon="plus" onClick={addProd}>Agregar producto</Btn><Btn kind="outline" icon="upload" onClick={()=>pickFile(".csv")}>Importar precios (CSV)</Btn></>} />
+        right={<><Btn kind="dark" icon="plus" onClick={openNew}>Agregar producto</Btn><Btn kind="outline" icon="upload" onClick={()=>pickFile(".csv")}>Importar precios (CSV)</Btn></>} />
       <Slot id="productos" ai={ai} />
       <Card pad={0} style={{ overflow:"hidden" }}>
         <div style={{ padding:"14px 16px", borderBottom:`1px solid ${Cc.line}`, display:"flex", gap:9, flexWrap:"wrap", alignItems:"center" }}>
@@ -190,7 +198,7 @@ function ProductosScreen({ ai }) {
                   <td style={{ padding:"13px 16px", textAlign:"right", font:`600 13px/1 ${Fc.mono}`, color: p.stock>0?Cc.green:Cc.inkFaint }}>{p.stock}</td>
                   <td style={{ padding:"13px 16px" }}>
                     <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-                      <IconBtn icon="file-pen" color={Cc.inkSoft} onClick={()=>editProd(p)} />
+                      <IconBtn icon="file-pen" color={Cc.inkSoft} onClick={()=>openEdit(p)} />
                       <IconBtn icon="trash-2" color={Cc.red} onClick={()=>delProd(p)} />
                     </div>
                   </td>
@@ -203,7 +211,57 @@ function ProductosScreen({ ai }) {
           </table>
         </div>
       </Card>
+
+      {/* Alta / edición de producto */}
+      <Modal open={!!draft} onClose={()=>setDraft(null)} icon="package"
+        title={draft && draft.ref ? "Editar producto" : "Nuevo producto"} width={460}
+        footer={<>
+          <Btn kind="outline" onClick={()=>setDraft(null)}>Cancelar</Btn>
+          <Btn kind="dark" icon="check" onClick={saveDraft}>Guardar</Btn>
+        </>}>
+        {draft && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <ProdField label="Nombre">
+              <input style={{ ...inputCfg, width:"100%" }} value={draft.n} autoFocus
+                onChange={e=>setF("n", e.target.value)} placeholder="Nombre del producto" />
+            </ProdField>
+            <ProdField label="Categoría">
+              <input style={{ ...inputCfg, width:"100%" }} value={draft.cat}
+                onChange={e=>setF("cat", e.target.value)} placeholder="Opcional (Lomos, Jamones…)" />
+            </ProdField>
+            <ProdField label="Tipo">
+              <div style={{ display:"flex", gap:8 }}>
+                {[["Hijo","Hijo · se vende"],["Padre","Padre · se despieza"]].map(([t,lbl])=>{
+                  const on = draft.tipo===t;
+                  return <button key={t} onClick={()=>setF("tipo", t)} style={{ flex:1, font:`700 12.5px/1.2 ${Fc.ui}`,
+                    padding:"11px 12px", borderRadius:9, cursor:"pointer", border:`1px solid ${on?"transparent":Cc.line}`,
+                    color:on?Cc.chromeFg:Cc.inkSoft, background:on?Cc.chrome:Cc.paper }}>{lbl}</button>;
+                })}
+              </div>
+            </ProdField>
+            <div style={{ display:"flex", gap:12 }}>
+              <ProdField label="Precio por kg ($)">
+                <input type="number" min="0" step="0.01" style={{ ...inputCfg, width:"100%" }} value={draft.precio}
+                  onChange={e=>setF("precio", e.target.value)} />
+              </ProdField>
+              <ProdField label="Stock (piezas)">
+                <input type="number" min="0" step="1" style={{ ...inputCfg, width:"100%" }} value={draft.stock}
+                  onChange={e=>setF("stock", e.target.value)} />
+              </ProdField>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
+  );
+}
+function ProdField({ label, children }) {
+  return (
+    <label style={{ display:"block", flex:1 }}>
+      <div style={{ font:`600 11px/1 ${Fc.ui}`, letterSpacing:"0.04em", textTransform:"uppercase",
+        color:Cc.inkFaint, marginBottom:7 }}>{label}</div>
+      {children}
+    </label>
   );
 }
 function IconBtn({ icon, color, onClick }) {
