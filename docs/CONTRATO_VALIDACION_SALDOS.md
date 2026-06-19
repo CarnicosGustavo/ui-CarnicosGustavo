@@ -92,7 +92,13 @@ El RPC existe en **dos esquemas** con la misma firma:
 
 ## Estado de la verificación
 - ✅ Contrato JS (endpoint ↔ pantalla): auditado, los campos coinciden.
-- ✅ Vistas/RPC en Supabase: **verificado** (2026-06-16). Existen `v_validacion_saldos`,
-  `v_validacion_docs` y `public.validar_saldo_legacy`; columnas compatibles; datos reales
-  158 clientes / 79 con saldo. `public` ya delega en `staging` (Validar mueve el saldo a crédito).
+- ✅ Vistas/RPC en Supabase: **verificado contra la BD (2026-06-16)**.
+  - `v_validacion_saldos`: `id, customer_id, nombre, saldo, limite, dias, ndoc,
+    validado, validado_at, validado_por` (+ `importado, importado_at` extra).
+  - `v_validacion_docs`: `customer_id, fecha, venc, tipo, ref, importe, saldo, obs`
+    (+ `legacy_cliente, estado_raw` extra).
+  - `public.validar_saldo_legacy(int, text DEFAULT NULL) → boolean` — único, y ya
+    **delega en `staging`** (Validar mueve el saldo a crédito).
+  - Datos: 158 clientes (79 con saldo), 78 pendientes por $1,253,946.30, 1 validado,
+    279 documentos. Columnas compatibles con `api/validacion.js`.
 - 📄 Migración reproducible: `sql/2026-06-16_validacion_saldos.sql`.
