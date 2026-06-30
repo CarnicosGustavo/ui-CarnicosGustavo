@@ -545,7 +545,7 @@ function cgDeepMerge(target, src) {
 }
 CG.meta = { source: "mock", at: null };
 CG.refresh = function () {
-  return fetch("/api/cg-data", { headers: { accept: "application/json" } })
+  return fetch("/api/cg-data", { headers: { accept: "application/json" }, cache: "no-store" })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (payload) {
       CG.meta = { source: (payload && payload._source) || "mock", at: Date.now() };
