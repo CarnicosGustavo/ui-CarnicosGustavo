@@ -47,7 +47,10 @@ function dispOf(p) {
 }
 
 export default async function handler(req, res) {
-	res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=120");
+	// Sin caché de CDN: es estado operativo en vivo. Con s-maxage/SWR, un pedido
+	// recién creado no aparecía al refrescar (se servía la lista cacheada anterior),
+	// y parecía que "no se registró".
+	res.setHeader("Cache-Control", "no-store, max-age=0");
 	if (!SERVICE_KEY) {
 		return res.status(200).json({ _source: "mock", _note: "SUPABASE_SERVICE_ROLE_KEY no configurada" });
 	}
